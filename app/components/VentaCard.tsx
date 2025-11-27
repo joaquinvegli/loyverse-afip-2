@@ -7,17 +7,25 @@ import { fetchCliente, facturarVenta } from "../lib/api";
 export default function VentaCard({ venta }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [cliente, setCliente] = useState(null);
-  const [email, setEmail] = useState("");
 
   async function abrirModal() {
     setModalOpen(true);
 
     if (venta.cliente_id) {
       const data = await fetchCliente(venta.cliente_id);
-      setCliente(data);
-      setEmail(data.email || "");
+
+      // Nos aseguramos de que siempre tenga dni, phone, email, etc.
+      setCliente({
+        exists: data.exists,
+        id: data.id,
+        name: data.name,
+        email: data.email || "",
+        phone: data.phone || "",
+        dni: data.dni || null,
+      });
+
     } else {
-      // consumidor final sin cliente asociado
+      // Consumidor final
       setCliente({
         exists: false,
         id: null,
@@ -34,7 +42,7 @@ export default function VentaCard({ venta }) {
   }
 
   // =====================================================
-  // NUEVA FUNCIÓN — LLAMA AL BACKEND /api/facturar
+  // FUNCIÓN QUE LLAMA AL BACKEND /api/facturar
   // =====================================================
   async function generarFactura() {
     if (!cliente) {
@@ -49,7 +57,7 @@ export default function VentaCard({ venta }) {
           id: cliente.id,
           name: cliente.name,
           email: cliente.email,
-          dni: cliente.dni, // si no tiene dni → consumidor final
+          dni: cliente.dni, // si no tiene DNI → consumidor final
         },
         items: venta.items.map((item) => ({
           nombre: item.nombre,
@@ -92,8 +100,8 @@ export default function VentaCard({ venta }) {
         onClose={cerrarModal}
         venta={venta}
         cliente={cliente}
-        onEmailChange={(email) =>
-          setCliente((c) => ({ ...c, email: email }))
+        onEmailChange={(nuevoEmail) =>
+          setCliente((c) => ({ ...c, email: nuevoEmail }))
         }
         onFacturar={generarFactura}
       />
