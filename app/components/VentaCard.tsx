@@ -9,12 +9,9 @@ export default function VentaCard({ venta }) {
   const [cliente, setCliente] = useState(null);
 
   async function abrirModal() {
-    setModalOpen(true);
 
     if (venta.cliente_id) {
       const data = await fetchCliente(venta.cliente_id);
-
-      // Nos aseguramos de que siempre tenga dni, phone, email, etc.
       setCliente({
         exists: data.exists,
         id: data.id,
@@ -25,7 +22,6 @@ export default function VentaCard({ venta }) {
       });
 
     } else {
-      // Consumidor final
       setCliente({
         exists: false,
         id: null,
@@ -35,15 +31,15 @@ export default function VentaCard({ venta }) {
         dni: null,
       });
     }
+
+    // 🔥 ABRIR EL MODAL SOLO DESPUÉS DE TENER CLIENTE
+    setModalOpen(true);
   }
 
   function cerrarModal() {
     setModalOpen(false);
   }
 
-  // =====================================================
-  // FUNCIÓN QUE LLAMA AL BACKEND /api/facturar
-  // =====================================================
   async function generarFactura() {
     if (!cliente) {
       alert("No se pudo cargar el cliente.");
@@ -57,7 +53,7 @@ export default function VentaCard({ venta }) {
           id: cliente.id,
           name: cliente.name,
           email: cliente.email,
-          dni: cliente.dni, // si no tiene DNI → consumidor final
+          dni: cliente.dni,
         },
         items: venta.items.map((item) => ({
           nombre: item.nombre,
