@@ -1,24 +1,5 @@
 "use client";
 
-import React, { useState } from "react";
-
-interface ClienteData {
-  exists: boolean;
-  id: string;
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-}
-
-interface FacturaModalProps {
-  open: boolean;
-  onClose: () => void;
-  venta: any;
-  cliente: ClienteData | null;
-  onEmailChange: (email: string) => void;
-  onFacturar: () => void;
-}
-
 export default function FacturaModal({
   open,
   onClose,
@@ -26,51 +7,97 @@ export default function FacturaModal({
   cliente,
   onEmailChange,
   onFacturar,
-}: FacturaModalProps) {
+}) {
   if (!open) return null;
 
+  const items = venta?.items || [];
+  const total = venta?.total || 0;
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white shadow-xl p-6 rounded-xl w-[400px] relative">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+      <div className="bg-white w-full max-w-md rounded-lg shadow-lg p-6 relative">
 
-        <h2 className="text-xl font-bold mb-4">
-          Facturar venta #{venta?.receipt_id}
-        </h2>
+        {/* Cerrar modal */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+        >
+          ✖
+        </button>
 
-        {/* DATOS DEL CLIENTE */}
-        <div className="mb-4">
-          <p className="text-sm mb-1 font-semibold">Cliente:</p>
-          <p>{cliente?.name || "Consumidor Final"}</p>
+        <h2 className="text-xl font-bold mb-4">Facturar Venta #{venta?.receipt_id}</h2>
 
-          <p className="text-sm mt-3 font-semibold">Email:</p>
+        {/* Cliente */}
+        <div className="mb-3">
+          <label className="block text-sm font-semibold">Cliente:</label>
+          <p className="text-gray-800">
+            {cliente?.name || "Consumidor Final"}
+          </p>
+        </div>
+
+        {/* DNI */}
+        <div className="mb-3">
+          <label className="block text-sm font-semibold">DNI:</label>
+          <input
+            type="text"
+            value={cliente?.dni || ""}
+            readOnly
+            className="w-full border rounded p-2 bg-gray-100"
+          />
+        </div>
+
+        {/* Email editable */}
+        <div className="mb-3">
+          <label className="block text-sm font-semibold">Email (para enviar factura):</label>
           <input
             type="email"
-            className="border p-2 rounded w-full"
             value={cliente?.email || ""}
             onChange={(e) => onEmailChange(e.target.value)}
-            placeholder="cliente@example.com"
+            className="w-full border rounded p-2"
+            placeholder="example@gmail.com"
           />
-
-          <p className="text-sm mt-3 font-semibold">Teléfono:</p>
-          <p>{cliente?.phone || "-"}</p>
         </div>
 
-        {/* BOTONES */}
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-            onClick={onClose}
-          >
-            Cancelar
-          </button>
-
-          <button
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            onClick={onFacturar}
-          >
-            Generar factura
-          </button>
+        {/* Teléfono */}
+        <div className="mb-3">
+          <label className="block text-sm font-semibold">Teléfono:</label>
+          <input
+            type="text"
+            value={cliente?.phone || ""}
+            readOnly
+            className="w-full border rounded p-2 bg-gray-100"
+          />
         </div>
+
+        {/* Items */}
+        <div className="mb-3">
+          <label className="block text-sm font-semibold">Productos:</label>
+
+          <div className="border rounded p-2 max-h-32 overflow-y-auto bg-gray-50">
+            {items.map((item, i) => (
+              <div key={i} className="flex justify-between text-sm border-b py-1">
+                <span>{item.nombre}</span>
+                <span>{item.cantidad} x ${item.precio_unitario}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Total */}
+        <div className="mb-4">
+          <p className="text-lg font-semibold">
+            Total: <span className="text-green-700">${total}</span>
+          </p>
+        </div>
+
+        {/* Botón Facturar */}
+        <button
+          onClick={onFacturar}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+        >
+          Generar Factura
+        </button>
+
       </div>
     </div>
   );

@@ -28,7 +28,7 @@ export default function HomePage() {
   return (
     <div style={{ padding: "30px", maxWidth: "800px", margin: "auto" }}>
       <h1>📘 Facturación Loyverse + AFIP</h1>
-
+      <div className="bg-red-500 text-white p-4">TEST COLOR</div>
       <div style={{ marginBottom: "20px" }}>
         <h3>Seleccionar fechas:</h3>
 
