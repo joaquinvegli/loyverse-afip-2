@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 export default function FacturaModal({
   open,
   onClose,
@@ -8,7 +10,16 @@ export default function FacturaModal({
   onEmailChange,
   onFacturar,
 }) {
-  if (!open || !cliente) return null;
+  const [localCliente, setLocalCliente] = useState(null);
+
+  // 🔥 SINCRONIZAR CUANDO LLEGA UN CLIENTE NUEVO
+  useEffect(() => {
+    if (cliente) {
+      setLocalCliente(cliente);
+    }
+  }, [cliente]);
+
+  if (!open || !localCliente) return null;
 
   const items = venta?.items || [];
   const total = venta?.total || 0;
@@ -33,7 +44,7 @@ export default function FacturaModal({
         <div className="mb-3">
           <label className="block text-sm font-semibold">Cliente:</label>
           <p className="text-gray-800">
-            {cliente.name || "Consumidor Final"}
+            {localCliente.name || "Consumidor Final"}
           </p>
         </div>
 
@@ -42,7 +53,7 @@ export default function FacturaModal({
           <label className="block text-sm font-semibold">DNI:</label>
           <input
             type="text"
-            value={cliente.dni || ""}
+            value={localCliente.dni || ""}
             readOnly
             className="w-full border rounded p-2 bg-gray-100"
           />
@@ -55,8 +66,11 @@ export default function FacturaModal({
           </label>
           <input
             type="email"
-            value={cliente.email || ""}
-            onChange={(e) => onEmailChange(e.target.value)}
+            value={localCliente.email || ""}
+            onChange={(e) => {
+              setLocalCliente({ ...localCliente, email: e.target.value });
+              onEmailChange(e.target.value);
+            }}
             className="w-full border rounded p-2"
             placeholder="example@gmail.com"
           />
@@ -67,7 +81,7 @@ export default function FacturaModal({
           <label className="block text-sm font-semibold">Teléfono:</label>
           <input
             type="text"
-            value={cliente.phone || ""}
+            value={localCliente.phone || ""}
             readOnly
             className="w-full border rounded p-2 bg-gray-100"
           />
@@ -96,12 +110,12 @@ export default function FacturaModal({
           </p>
         </div>
 
-        {/* Botón para facturar */}
+        {/* Botón Facturar */}
         <button
           onClick={onFacturar}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
         >
-          Generar Factura
+          Generar Fáctura
         </button>
 
       </div>
