@@ -6,20 +6,16 @@ import { fetchCliente, facturarVenta } from "../lib/api";
 
 export default function VentaCard({ venta }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [cliente, setCliente] = useState(null);
+  const [cliente, setCliente] = useState<any>(null);
+  const [email, setEmail] = useState("");
 
   async function abrirModal() {
+    setModalOpen(true);
+
     if (venta.cliente_id) {
       const data = await fetchCliente(venta.cliente_id);
-
-      setCliente({
-        exists: data.exists,
-        id: data.id,
-        name: data.name,
-        email: data.email || "",
-        phone: data.phone || "",
-        dni: data.dni || null,
-      });
+      setCliente(data);
+      setEmail(data.email || "");
     } else {
       setCliente({
         exists: false,
@@ -30,12 +26,36 @@ export default function VentaCard({ venta }) {
         dni: null,
       });
     }
-
-    setModalOpen(true);
   }
 
   function cerrarModal() {
     setModalOpen(false);
+  }
+
+  function formatearFechaAAAAMMDD(fecha?: string) {
+    if (!fecha || fecha.length !== 8) return fecha || "";
+    const yyyy = fecha.substring(0, 4);
+    const mm = fecha.substring(4, 6);
+    const dd = fecha.substring(6, 8);
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // Convierte base64 -> Blob PDF y lo abre en nueva pestaña
+  function abrirPdfBase64(b64: string) {
+    if (!b64) return;
+    try {
+      const byteChars = atob(b64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch (e) {
+      console.error("Error abriendo PDF:", e);
+    }
   }
 
   async function generarFactura() {
@@ -53,7 +73,7 @@ export default function VentaCard({ venta }) {
           email: cliente.email,
           dni: cliente.dni,
         },
-        items: venta.items.map((item) => ({
+        items: venta.items.map((item: any) => ({
           nombre: item.nombre,
           cantidad: item.cantidad,
           precio_unitario: item.precio_unitario,
@@ -63,24 +83,29 @@ export default function VentaCard({ venta }) {
 
       const resp = await facturarVenta(payload);
 
+      const fechaCAE = formatearFechaAAAAMMDD(resp.vencimiento);
+
       alert(
-        `Factura generada correctamente\n\nCAE: ${resp.cae}\nVencimiento: ${resp.vto_cae}`
+        `Factura generada correctamente!\n\n` +
+          `CAE: ${resp.cae}\n` +
+          `Vencimiento CAE: ${fechaCAE}\n\n` +
+          `Número comprobante: ${resp.cbte_nro}\n\n` +
+          `Se abrirá la factura en PDF en otra pestaña.`
       );
 
+      // Abrir PDF en nueva pestaña
+      if (resp.pdf_base64) {
+        abrirPdfBase64(resp.pdf_base64);
+      }
+
       setModalOpen(false);
-    } catch (e) {
+    } catch (e: any) {
       alert("Error al generar factura: " + e.message);
     }
   }
 
   return (
     <div className="border p-4 rounded shadow-md bg-white">
-
-      {/* 🔥 DEBUG VISUAL — MOSTRAR CLIENTE_ID */}
-      <p className="text-xs text-gray-500 mb-1">
-        <b>cliente_id:</b> {String(venta.cliente_id)}
-      </p>
-
       <h3 className="font-bold text-lg mb-1">Venta #{venta.receipt_id}</h3>
       <p className="text-sm mb-1">{venta.fecha}</p>
       <p className="text-md font-semibold">Total: ${venta.total}</p>
@@ -99,8 +124,8 @@ export default function VentaCard({ venta }) {
         onClose={cerrarModal}
         venta={venta}
         cliente={cliente}
-        onEmailChange={(nuevoEmail) =>
-          setCliente((c) => ({ ...c, email: nuevoEmail }))
+        onEmailChange={(email) =>
+          setCliente((c: any) => ({ ...c, email: email }))
         }
         onFacturar={generarFactura}
       />
