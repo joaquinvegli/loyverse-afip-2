@@ -3,7 +3,6 @@
 import { useState } from "react";
 import VentaCard from "./components/VentaCard";
 import { fetchVentas } from "./lib/api";
-console.log("DEBUG BACKEND URL:", process.env.NEXT_PUBLIC_BACKEND_URL);
 
 export default function HomePage() {
   const [desde, setDesde] = useState("2025-11-26");
