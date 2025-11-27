@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import FacturaModal from "./FacturaModal";
-import { fetchCliente } from "../lib/api";
+import { fetchCliente, facturarVenta } from "../lib/api";
 
 export default function VentaCard({ venta }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,6 +24,7 @@ export default function VentaCard({ venta }) {
         name: "Consumidor Final",
         email: "",
         phone: "",
+        dni: null,
       });
     }
   }
@@ -32,8 +33,43 @@ export default function VentaCard({ venta }) {
     setModalOpen(false);
   }
 
+  // =====================================================
+  // NUEVA FUNCIÓN — LLAMA AL BACKEND /api/facturar
+  // =====================================================
   async function generarFactura() {
-    alert("Aquí llamaremos al endpoint /api/facturar (próximo paso)");
+    if (!cliente) {
+      alert("No se pudo cargar el cliente.");
+      return;
+    }
+
+    try {
+      const payload = {
+        receipt_id: venta.receipt_id,
+        cliente: {
+          id: cliente.id,
+          name: cliente.name,
+          email: cliente.email,
+          dni: cliente.dni, // si no tiene dni → consumidor final
+        },
+        items: venta.items.map((item) => ({
+          nombre: item.nombre,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+        })),
+        total: venta.total,
+      };
+
+      const resp = await facturarVenta(payload);
+
+      alert(
+        `Factura generada correctamente\n\nCAE: ${resp.cae}\nVencimiento: ${resp.vto_cae}`
+      );
+
+      setModalOpen(false);
+
+    } catch (e) {
+      alert("Error al generar factura: " + e.message);
+    }
   }
 
   return (
