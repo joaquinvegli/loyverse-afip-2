@@ -2,15 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fuerza modo claro siempre */
-:root {
-  --background-start-rgb: 245, 245, 245;
-  --background-end-rgb: 245, 245, 245;
-  --foreground-rgb: 20, 20, 20;
+/* --- FONDO CON DEGRADÉ LINDO --- */
+body {
+  @apply bg-gradient-to-br from-gray-100 via-white to-gray-200 min-h-screen text-gray-900;
 }
 
-/* Fondo suave gris claro */
-body {
-  background: rgb(var(--background-start-rgb));
-  color: rgb(var(--foreground-rgb));
+/* --- Tarjetas más suaves --- */
+.card-shadow {
+  @apply rounded-xl shadow-lg bg-white border border-gray-200;
+}
+
+/* --- Botones suaves --- */
+.btn-primary {
+  @apply px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition;
+}
+
+/* --- Inputs --- */
+.input-text {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
