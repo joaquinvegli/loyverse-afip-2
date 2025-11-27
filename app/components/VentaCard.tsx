@@ -40,24 +40,6 @@ export default function VentaCard({ venta }) {
     return `${dd}/${mm}/${yyyy}`;
   }
 
-  // Convierte base64 -> Blob PDF y lo abre en nueva pestaña
-  function abrirPdfBase64(b64: string) {
-    if (!b64) return;
-    try {
-      const byteChars = atob(b64);
-      const byteNumbers = new Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) {
-        byteNumbers[i] = byteChars.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-    } catch (e) {
-      console.error("Error abriendo PDF:", e);
-    }
-  }
-
   async function generarFactura() {
     if (!cliente) {
       alert("No se pudo cargar el cliente.");
@@ -90,12 +72,13 @@ export default function VentaCard({ venta }) {
           `CAE: ${resp.cae}\n` +
           `Vencimiento CAE: ${fechaCAE}\n\n` +
           `Número comprobante: ${resp.cbte_nro}\n\n` +
-          `Se abrirá la factura en PDF en otra pestaña.`
+          `El PDF se abrirá en una nueva pestaña.`
       );
 
-      // Abrir PDF en nueva pestaña
-      if (resp.pdf_base64) {
-        abrirPdfBase64(resp.pdf_base64);
+      // 📌 ABRIR PDF desde backend
+      if (resp.pdf_url) {
+        const url = process.env.NEXT_PUBLIC_BACKEND_URL + resp.pdf_url;
+        window.open(url, "_blank");
       }
 
       setModalOpen(false);
