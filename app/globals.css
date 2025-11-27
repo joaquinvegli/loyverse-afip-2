@@ -2,13 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fuerza que el sitio siempre esté en modo claro */
-html {
-  color-scheme: light;
-  background: #f5f5f5;
+/* Fuerza modo claro siempre */
+:root {
+  --background-start-rgb: 245, 245, 245;
+  --background-end-rgb: 245, 245, 245;
+  --foreground-rgb: 20, 20, 20;
 }
 
+/* Fondo suave gris claro */
 body {
-  background-color: #f5f5f5 !important;
-  color: #111 !important;
+  background: rgb(var(--background-start-rgb));
+  color: rgb(var(--foreground-rgb));
 }
