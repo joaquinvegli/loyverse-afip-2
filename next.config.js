@@ -1,24 +1,26 @@
-// next.config.js
-
+/** @type {import('next').NextConfig} */
 const fs = require("fs");
 
-function loadStackblitzEnv() {
-  const file = "env.local"; // sin punto
-  if (fs.existsSync(file)) {
-    const lines = fs.readFileSync(file, "utf8").split("\n");
+let customEnv = {};
+
+try {
+  if (fs.existsSync("./env.local")) {
+    const lines = fs.readFileSync("./env.local", "utf8").split("\n");
     for (const line of lines) {
       const [key, value] = line.split("=");
       if (key && value) {
-        process.env[key.trim()] = value.trim();
+        customEnv[key.trim()] = value.trim();
       }
     }
   }
+} catch (e) {
+  console.log("Error cargando env.local", e);
 }
 
-if (process.env.STACKBLITZ_HOST) {
-  loadStackblitzEnv();
-}
-
-module.exports = {
-  reactStrictMode: true,
+const nextConfig = {
+  env: {
+    ...customEnv,
+  },
 };
+
+module.exports = nextConfig;
