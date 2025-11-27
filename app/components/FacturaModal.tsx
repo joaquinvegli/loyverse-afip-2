@@ -8,7 +8,7 @@ export default function FacturaModal({
   onEmailChange,
   onFacturar,
 }) {
-  if (!open) return null;
+  if (!open || !cliente) return null;
 
   const items = venta?.items || [];
   const total = venta?.total || 0;
@@ -25,13 +25,15 @@ export default function FacturaModal({
           ✖
         </button>
 
-        <h2 className="text-xl font-bold mb-4">Facturar Venta #{venta?.receipt_id}</h2>
+        <h2 className="text-xl font-bold mb-4">
+          Facturar Venta #{venta?.receipt_id}
+        </h2>
 
         {/* Cliente */}
         <div className="mb-3">
           <label className="block text-sm font-semibold">Cliente:</label>
           <p className="text-gray-800">
-            {cliente?.name || "Consumidor Final"}
+            {cliente.name || "Consumidor Final"}
           </p>
         </div>
 
@@ -40,7 +42,7 @@ export default function FacturaModal({
           <label className="block text-sm font-semibold">DNI:</label>
           <input
             type="text"
-            value={cliente?.dni || ""}
+            value={cliente.dni || ""}
             readOnly
             className="w-full border rounded p-2 bg-gray-100"
           />
@@ -48,10 +50,12 @@ export default function FacturaModal({
 
         {/* Email editable */}
         <div className="mb-3">
-          <label className="block text-sm font-semibold">Email (para enviar factura):</label>
+          <label className="block text-sm font-semibold">
+            Email (para enviar factura):
+          </label>
           <input
             type="email"
-            value={cliente?.email || ""}
+            value={cliente.email || ""}
             onChange={(e) => onEmailChange(e.target.value)}
             className="w-full border rounded p-2"
             placeholder="example@gmail.com"
@@ -63,13 +67,13 @@ export default function FacturaModal({
           <label className="block text-sm font-semibold">Teléfono:</label>
           <input
             type="text"
-            value={cliente?.phone || ""}
+            value={cliente.phone || ""}
             readOnly
             className="w-full border rounded p-2 bg-gray-100"
           />
         </div>
 
-        {/* Items */}
+        {/* Productos */}
         <div className="mb-3">
           <label className="block text-sm font-semibold">Productos:</label>
 
@@ -77,7 +81,9 @@ export default function FacturaModal({
             {items.map((item, i) => (
               <div key={i} className="flex justify-between text-sm border-b py-1">
                 <span>{item.nombre}</span>
-                <span>{item.cantidad} x ${item.precio_unitario}</span>
+                <span>
+                  {item.cantidad} x ${item.precio_unitario}
+                </span>
               </div>
             ))}
           </div>
@@ -90,7 +96,7 @@ export default function FacturaModal({
           </p>
         </div>
 
-        {/* Botón Facturar */}
+        {/* Botón para facturar */}
         <button
           onClick={onFacturar}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
