@@ -9,9 +9,9 @@ export default function VentaCard({ venta }) {
   const [cliente, setCliente] = useState(null);
 
   async function abrirModal() {
-
     if (venta.cliente_id) {
       const data = await fetchCliente(venta.cliente_id);
+
       setCliente({
         exists: data.exists,
         id: data.id,
@@ -20,7 +20,6 @@ export default function VentaCard({ venta }) {
         phone: data.phone || "",
         dni: data.dni || null,
       });
-
     } else {
       setCliente({
         exists: false,
@@ -32,7 +31,6 @@ export default function VentaCard({ venta }) {
       });
     }
 
-    // 🔥 ABRIR EL MODAL SOLO DESPUÉS DE TENER CLIENTE
     setModalOpen(true);
   }
 
@@ -70,7 +68,6 @@ export default function VentaCard({ venta }) {
       );
 
       setModalOpen(false);
-
     } catch (e) {
       alert("Error al generar factura: " + e.message);
     }
@@ -78,6 +75,12 @@ export default function VentaCard({ venta }) {
 
   return (
     <div className="border p-4 rounded shadow-md bg-white">
+
+      {/* 🔥 DEBUG VISUAL — MOSTRAR CLIENTE_ID */}
+      <p className="text-xs text-gray-500 mb-1">
+        <b>cliente_id:</b> {String(venta.cliente_id)}
+      </p>
+
       <h3 className="font-bold text-lg mb-1">Venta #{venta.receipt_id}</h3>
       <p className="text-sm mb-1">{venta.fecha}</p>
       <p className="text-md font-semibold">Total: ${venta.total}</p>
