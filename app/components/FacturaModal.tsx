@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 
-type FacturaModalProps = {
+// Tipado de props
+interface FacturaModalProps {
   open: boolean;
   onClose: () => void;
   venta: any;
   cliente: any;
   onEmailChange: (email: string) => void;
   onFacturar: () => void;
-};
+}
 
 export default function FacturaModal({
   open,
@@ -19,13 +20,12 @@ export default function FacturaModal({
   onEmailChange,
   onFacturar,
 }: FacturaModalProps) {
+
   const [localCliente, setLocalCliente] = useState<any>(null);
 
-  // 🔥 Sincronizar cuando llega un cliente nuevo
+  // Sincronizar datos cuando cambia el cliente
   useEffect(() => {
-    if (cliente) {
-      setLocalCliente(cliente);
-    }
+    if (cliente) setLocalCliente(cliente);
   }, [cliente]);
 
   if (!open || !localCliente) return null;
@@ -77,8 +77,9 @@ export default function FacturaModal({
             type="email"
             value={localCliente.email || ""}
             onChange={(e) => {
-              setLocalCliente({ ...localCliente, email: e.target.value });
-              onEmailChange(e.target.value);
+              const newEmail = e.target.value;
+              setLocalCliente({ ...localCliente, email: newEmail });
+              onEmailChange(newEmail);
             }}
             className="w-full border rounded p-2"
             placeholder="example@gmail.com"
