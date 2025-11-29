@@ -7,7 +7,6 @@ import { fetchCliente, facturarVenta } from "../lib/api";
 export default function VentaCard({ venta }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [cliente, setCliente] = useState<any>(null);
-  const [email, setEmail] = useState("");
 
   async function abrirModal() {
     setModalOpen(true);
@@ -15,7 +14,6 @@ export default function VentaCard({ venta }) {
     if (venta.cliente_id) {
       const data = await fetchCliente(venta.cliente_id);
       setCliente(data);
-      setEmail(data.email || "");
     } else {
       setCliente({
         exists: false,
@@ -32,12 +30,20 @@ export default function VentaCard({ venta }) {
     setModalOpen(false);
   }
 
-  function formatearFechaAAAAMMDD(fecha?: string) {
-    if (!fecha || fecha.length !== 8) return fecha || "";
-    const yyyy = fecha.substring(0, 4);
-    const mm = fecha.substring(4, 6);
-    const dd = fecha.substring(6, 8);
-    return `${dd}/${mm}/${yyyy}`;
+  function abrirPdfBase64(b64: string) {
+    try {
+      const byteChars = atob(b64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank"); // se abre sin ser bloqueado
+    } catch (e) {
+      console.error("Error abriendo PDF:", e);
+    }
   }
 
   async function generarFactura() {
@@ -65,21 +71,16 @@ export default function VentaCard({ venta }) {
 
       const resp = await facturarVenta(payload);
 
-      const fechaCAE = formatearFechaAAAAMMDD(resp.vencimiento);
+      // abrir PDF ANTES del alert
+      if (resp.pdf_base64) abrirPdfBase64(resp.pdf_base64);
 
       alert(
-        `Factura generada correctamente!\n\n` +
+        `Factura generada!\n\n` +
           `CAE: ${resp.cae}\n` +
-          `Vencimiento CAE: ${fechaCAE}\n\n` +
-          `Número comprobante: ${resp.cbte_nro}\n\n` +
-          `El PDF se abrirá en una nueva pestaña.`
+          `Vencimiento: ${resp.vencimiento}\n\n` +
+          `Comprobante: ${resp.cbte_nro}\n\n` +
+          `El PDF se abrió en otra pestaña.`
       );
-
-      // 📌 ABRIR PDF desde backend
-      if (resp.pdf_url) {
-        const url = process.env.NEXT_PUBLIC_BACKEND_URL + resp.pdf_url;
-        window.open(url, "_blank");
-      }
 
       setModalOpen(false);
     } catch (e: any) {
