@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+type FacturaModalProps = {
+  open: boolean;
+  onClose: () => void;
+  venta: any;
+  cliente: any;
+  onEmailChange: (email: string) => void;
+  onFacturar: () => void;
+};
+
 export default function FacturaModal({
   open,
   onClose,
@@ -9,10 +18,10 @@ export default function FacturaModal({
   cliente,
   onEmailChange,
   onFacturar,
-}) {
-  const [localCliente, setLocalCliente] = useState(null);
+}: FacturaModalProps) {
+  const [localCliente, setLocalCliente] = useState<any>(null);
 
-  // 🔥 SINCRONIZAR CUANDO LLEGA UN CLIENTE NUEVO
+  // 🔥 Sincronizar cuando llega un cliente nuevo
   useEffect(() => {
     if (cliente) {
       setLocalCliente(cliente);
@@ -92,7 +101,7 @@ export default function FacturaModal({
           <label className="block text-sm font-semibold">Productos:</label>
 
           <div className="border rounded p-2 max-h-32 overflow-y-auto bg-gray-50">
-            {items.map((item, i) => (
+            {items.map((item: any, i: number) => (
               <div key={i} className="flex justify-between text-sm border-b py-1">
                 <span>{item.nombre}</span>
                 <span>
@@ -115,7 +124,7 @@ export default function FacturaModal({
           onClick={onFacturar}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
         >
-          Generar Fáctura
+          Generar Factura
         </button>
 
       </div>
