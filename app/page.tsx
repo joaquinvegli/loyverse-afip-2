@@ -11,13 +11,43 @@ export default function HomePage() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ============================
+  // FORMATEO DE FECHA
+  // ============================
+  function formatearFecha(fechaISO: string) {
+    try {
+      const fecha = new Date(fechaISO);
+
+      // Ajustar a UTC-3 manualmente (Loyverse envía UTC Z)
+      const fechaArg = new Date(fecha.getTime() - 3 * 60 * 60 * 1000);
+
+      const dia = fechaArg.getDate().toString().padStart(2, "0");
+      const mes = (fechaArg.getMonth() + 1).toString().padStart(2, "0");
+      const año = fechaArg.getFullYear();
+
+      const horas = fechaArg.getHours().toString().padStart(2, "0");
+      const minutos = fechaArg.getMinutes().toString().padStart(2, "0");
+
+      return `${dia}/${mes}/${año} ${horas}:${minutos}`;
+    } catch {
+      return fechaISO;
+    }
+  }
+
   async function cargarVentas() {
     setCargando(true);
     setError(null);
 
     try {
       const data = await fetchVentas(desde, hasta);
-      setVentas(data);
+
+      // 🔥 Formatear fechas antes de renderizar
+      const ventasConFecha = data.map((v: any) => ({
+        ...v,
+        fecha: formatearFecha(v.fecha),
+      }));
+
+      setVentas(ventasConFecha);
     } catch (e: any) {
       setError("Error cargando ventas: " + e.message);
     } finally {
@@ -28,7 +58,9 @@ export default function HomePage() {
   return (
     <div style={{ padding: "30px", maxWidth: "800px", margin: "auto" }}>
       <h1>📘 Facturación Loyverse + AFIP</h1>
+
       <div className="bg-red-500 text-white p-4">TEST COLOR</div>
+
       <div style={{ marginBottom: "20px" }}>
         <h3>Seleccionar fechas:</h3>
 
@@ -65,7 +97,7 @@ export default function HomePage() {
             color: "white",
             borderRadius: "6px",
             border: "none",
-            cursor: "pointer"
+            cursor: "pointer",
           }}
         >
           {cargando ? "Cargando..." : "Ver ventas"}

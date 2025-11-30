@@ -91,10 +91,73 @@ export default function VentaCard({ venta }: { venta: any }) {
     }
   }
 
+  // ============================
+  // MÉTODO DE PAGO + COLORES
+  // ============================
+  const pagos = Array.isArray(venta.pagos) ? venta.pagos : [];
+  const pagoPrincipal = pagos.length > 0 ? pagos[0] : null;
+
+  function getMetodoPagoBadge(pago: any) {
+    if (!pago) return null;
+
+    const tipo = (pago.tipo || "").toString().toUpperCase();
+    const nombre = (pago.nombre || "").toString().toUpperCase();
+
+    // Defaults
+    let label = "Otro medio de pago";
+    let colorClass =
+      "bg-gray-100 text-gray-800 border border-gray-300";
+
+    // Efectivo
+    if (tipo === "CASH" || nombre.includes("EFECTIVO")) {
+      label = "Efectivo";
+      colorClass =
+        "bg-green-100 text-green-800 border border-green-300";
+    }
+    // Tarjeta
+    else if (tipo === "CARD" || nombre.includes("TARJETA")) {
+      label = pago.nombre ? `Tarjeta (${pago.nombre})` : "Tarjeta";
+      colorClass =
+        "bg-blue-100 text-blue-800 border border-blue-300";
+    }
+    // Mercado Pago / QR
+    else if (
+      nombre.includes("MERCADO PAGO") ||
+      nombre.includes("MP") ||
+      nombre.includes("QR")
+    ) {
+      label = pago.nombre || "Mercado Pago / QR";
+      colorClass =
+        "bg-cyan-100 text-cyan-800 border border-cyan-300";
+    }
+    // Transferencia
+    else if (nombre.includes("TRANSFER")) {
+      label = "Transferencia";
+      colorClass =
+        "bg-purple-100 text-purple-800 border border-purple-300";
+    }
+
+    return { label, colorClass };
+  }
+
+  const metodoPago = getMetodoPagoBadge(pagoPrincipal);
+
   return (
     <div className="border p-4 rounded shadow-md bg-white">
       <h3 className="font-bold text-lg mb-1">Venta #{venta.receipt_id}</h3>
+
       <p className="text-sm mb-1">{venta.fecha}</p>
+
+      {metodoPago && (
+        <div className="mb-2">
+          <span
+            className={`inline-block text-xs font-semibold px-2 py-1 rounded-full ${metodoPago.colorClass}`}
+          >
+            {metodoPago.label}
+          </span>
+        </div>
+      )}
+
       <p className="text-md font-semibold">Total: ${venta.total}</p>
 
       <div className="mt-3">

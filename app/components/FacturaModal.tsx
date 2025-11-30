@@ -43,6 +43,7 @@ export default function FacturaModal({
   onFacturar,
 }: FacturaModalProps) {
   const [localCliente, setLocalCliente] = useState<Cliente | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // Sincronizar cuando llega un cliente nuevo
   useEffect(() => {
@@ -55,6 +56,15 @@ export default function FacturaModal({
 
   const items = venta?.items || [];
   const total = venta?.total || 0;
+
+  const handleFacturarClick = async () => {
+    setLoading(true);
+    try {
+      await onFacturar();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
@@ -147,10 +157,17 @@ export default function FacturaModal({
 
         {/* Botón Facturar */}
         <button
-          onClick={onFacturar}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+          onClick={handleFacturarClick}
+          disabled={loading}
+          className={`w-full py-2 rounded text-white transition-all
+            ${
+              loading
+                ? "bg-blue-400 opacity-60 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }
+          `}
         >
-          Generar Factura
+          {loading ? "Cargando…" : "Generar Factura"}
         </button>
       </div>
     </div>
