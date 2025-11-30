@@ -4,14 +4,25 @@ import { useState } from "react";
 import FacturaModal from "./FacturaModal";
 import { fetchCliente, facturarVenta } from "../lib/api";
 
-export default function VentaCard({ venta }: { venta: any }) {
+export default function VentaCard({
+  venta,
+  onFacturada,
+}: {
+  venta: any;
+  onFacturada: () => void;
+}) {
+  const yaFacturada = venta.already_invoiced === true;
+  const invoice = venta.invoice;
+
   const [modalOpen, setModalOpen] = useState(false);
   const [cliente, setCliente] = useState<any>(null);
 
-  const yaFacturada = venta.already_invoiced === true;
-
+  // ==============================
+  // Abrir modal (solo si no está facturada)
+  // ==============================
   async function abrirModal() {
-    if (yaFacturada) return; // ⚠ impedir abrir modal
+    if (yaFacturada) return;
+
     setModalOpen(true);
 
     if (venta.cliente_id) {
@@ -33,25 +44,20 @@ export default function VentaCard({ venta }: { venta: any }) {
     setModalOpen(false);
   }
 
-  function abrirPdfBase64(b64: string) {
-    try {
-      const byteChars = atob(b64);
-      const byteNumbers = new Array(byteChars.length);
-
-      for (let i = 0; i < byteChars.length; i++) {
-        byteNumbers[i] = byteChars.charCodeAt(i);
-      }
-
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-
-      window.open(url, "_blank");
-    } catch (e) {
-      console.error("Error abriendo PDF:", e);
+  // ==============================
+  // Abrir PDF desde Google Drive
+  // ==============================
+  function abrirPdfDrive() {
+    if (!invoice?.drive_url) {
+      alert("No se encontró el PDF en Google Drive.");
+      return;
     }
+    window.open(invoice.drive_url, "_blank");
   }
 
+  // ==============================
+  // Generar factura (AFIP + Drive)
+  // ==============================
   async function generarFactura() {
     if (!cliente) {
       alert("No se pudo cargar el cliente.");
@@ -67,105 +73,123 @@ export default function VentaCard({ venta }: { venta: any }) {
           email: cliente.email,
           dni: cliente.dni,
         },
-        items: venta.items.map((item: any) => ({
-          nombre: item.nombre,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio_unitario,
-        })),
+        items: venta.items,
         total: venta.total,
       };
 
       const resp = await facturarVenta(payload);
 
-      if (resp.pdf_base64) abrirPdfBase64(resp.pdf_base64);
+      // Abrir PDF que viene en base64 (solo esta vez)
+      if (resp.pdf_base64) {
+        try {
+          const byteChars = atob(resp.pdf_base64);
+          const byteNumbers = new Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) {
+            byteNumbers[i] = byteChars.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          window.open(url, "_blank");
+        } catch (e) {
+          console.error("Error abriendo PDF local:", e);
+        }
+      }
 
-      alert(
-        `Factura generada!\n\n` +
-          `CAE: ${resp.cae}\n` +
-          `Vencimiento: ${resp.vencimiento}\n\n` +
-          `Comprobante: ${resp.cbte_nro}\n\n` +
-          `El PDF se abrió en otra pestaña.`
-      );
-
+      onFacturada();
       setModalOpen(false);
     } catch (e: any) {
+      if (e.message.includes("ya fue facturada")) {
+        alert("Esta venta ya fue facturada anteriormente.");
+        onFacturada();
+        setModalOpen(false);
+        return;
+      }
+
       alert("Error al generar factura: " + e.message);
     }
   }
 
-  // ============================
-  // MÉTODO DE PAGO + COLORES (igual que antes)
-  // ============================
+  // ==============================
+  // Método de pago (badge)
+  // ==============================
   const pagos = Array.isArray(venta.pagos) ? venta.pagos : [];
-  const pagoPrincipal = pagos.length > 0 ? pagos[0] : null;
+  const pagoPrincipal = pagos[0] ?? null;
 
-  function getMetodoPagoBadge(pago: any) {
-    if (!pago) return null;
+  function metodoBadge() {
+    if (!pagoPrincipal) return null;
 
-    const tipo = (pago.tipo || "").toString().toUpperCase();
-    const nombre = (pago.nombre || "").toString().toUpperCase();
+    const tipo = (pagoPrincipal.tipo || "").toUpperCase();
+    const nombre = (pagoPrincipal.nombre || "").toUpperCase();
 
     let label = "Otro medio de pago";
-    let colorClass =
-      "bg-gray-100 text-gray-800 border border-gray-300";
+    let color = "bg-gray-200 text-gray-700";
 
-    if (tipo === "CASH" || nombre.includes("EFECTIVO")) {
-      label = "Efectivo";
-      colorClass =
-        "bg-green-100 text-green-800 border border-green-300";
-    } else if (tipo === "CARD" || nombre.includes("TARJETA")) {
-      label = pago.nombre ? `Tarjeta (${pago.nombre})` : "Tarjeta";
-      colorClass =
-        "bg-blue-100 text-blue-800 border border-blue-300";
-    } else if (
-      nombre.includes("MERCADO PAGO") ||
-      nombre.includes("MP") ||
-      nombre.includes("QR")
-    ) {
-      label = pago.nombre || "Mercado Pago / QR";
-      colorClass =
-        "bg-cyan-100 text-cyan-800 border border-cyan-300";
-    } else if (nombre.includes("TRANSFER")) {
-      label = "Transferencia";
-      colorClass =
-        "bg-purple-100 text-purple-800 border border-purple-300";
-    }
+    if (tipo === "CASH" || nombre.includes("EFECTIVO"))
+      (label = "Efectivo"), (color = "bg-green-200 text-green-800");
+    else if (tipo === "CARD")
+      (label = `Tarjeta (${pagoPrincipal.nombre})`),
+        (color = "bg-blue-200 text-blue-800");
+    else if (nombre.includes("MP") || nombre.includes("QR"))
+      (label = "Mercado Pago / QR"),
+        (color = "bg-cyan-200 text-cyan-800");
+    else if (nombre.includes("TRANSFER"))
+      (label = "Transferencia"),
+        (color = "bg-purple-200 text-purple-800");
 
-    return { label, colorClass };
+    return (
+      <span
+        className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${color}`}
+      >
+        {label}
+      </span>
+    );
   }
 
-  const metodoPago = getMetodoPagoBadge(pagoPrincipal);
-
+  // ==============================
+  // UI
+  // ==============================
   return (
-    <div className="border p-4 rounded shadow-md bg-white">
-      <h3 className="font-bold text-lg mb-1">
-        Venta #{venta.receipt_id}
-      </h3>
+    <div className="border p-4 rounded shadow-md bg-white relative">
+      <h3 className="font-bold text-lg">Venta #{venta.receipt_id}</h3>
+      <p className="text-sm">{venta.fecha}</p>
 
-      <p className="text-sm mb-1">{venta.fecha}</p>
-
-      {/* ============================
-          BADGE : YA FACTURADA
-      ============================ */}
+      {/* ==============================
+          BADGE FACTURADA + TOOLTIP
+      =============================== */}
       {yaFacturada && (
-        <span className="inline-block bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2">
-          ✓ Ya facturada
-        </span>
-      )}
-
-      {metodoPago && (
-        <div className="mb-2">
-          <span
-            className={`inline-block text-xs font-semibold px-2 py-1 rounded-full ${metodoPago.colorClass}`}
-          >
-            {metodoPago.label}
+        <div className="relative inline-block group mt-1">
+          {/* Badge */}
+          <span className="inline-block bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full cursor-pointer">
+            ✓ Facturada #{invoice?.cbte_nro || ""}
           </span>
+
+          {/* Tooltip */}
+          <div
+            className="absolute left-0 top-7 hidden group-hover:block bg-black text-white text-xs p-2 rounded shadow-lg whitespace-pre-line z-50 border border-gray-700"
+            style={{ minWidth: "180px" }}
+          >
+            {`Factura C emitida
+-----------------
+Comprobante: ${invoice?.cbte_nro}
+Punto de venta: ${invoice?.pto_vta}
+Fecha: ${invoice?.fecha}
+CAE: ${invoice?.cae}
+Vto CAE: ${invoice?.vencimiento}`}
+          </div>
         </div>
       )}
 
-      <p className="text-md font-semibold">Total: ${venta.total}</p>
+      {/* Medio de pago */}
+      <div className="mt-2">{metodoBadge()}</div>
 
-      <div className="mt-3">
+      <p className="font-semibold mt-2">Total: ${venta.total}</p>
+
+      {/* ==============================
+          BOTONES
+      =============================== */}
+      <div className="flex gap-2 mt-3">
+        {/* BOTÓN FACTURAR */}
         <button
           disabled={yaFacturada}
           onClick={abrirModal}
@@ -177,15 +201,26 @@ export default function VentaCard({ venta }: { venta: any }) {
         >
           {yaFacturada ? "Facturada" : "Facturar"}
         </button>
+
+        {/* BOTÓN VER PDF (Drive) */}
+        {yaFacturada && invoice?.drive_url && (
+          <button
+            onClick={abrirPdfDrive}
+            className="px-3 py-2 bg-gray-800 text-white rounded hover:bg-black"
+          >
+            Ver PDF
+          </button>
+        )}
       </div>
 
+      {/* Modal */}
       <FacturaModal
         open={modalOpen}
         onClose={cerrarModal}
         venta={venta}
         cliente={cliente}
         onEmailChange={(email) =>
-          setCliente((c: any) => ({ ...c, email: email }))
+          setCliente((c: any) => ({ ...c, email }))
         }
         onFacturar={generarFactura}
       />

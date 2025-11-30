@@ -12,13 +12,13 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   // ============================
-  // FORMATEO DE FECHA
+  // FORMATEO DE FECHA (UTC → ARG)
   // ============================
   function formatearFecha(fechaISO: string) {
     try {
       const fecha = new Date(fechaISO);
 
-      // Ajustar a UTC-3 manualmente (Loyverse envía UTC Z)
+      // Ajuste manual UTC-3
       const fechaArg = new Date(fecha.getTime() - 3 * 60 * 60 * 1000);
 
       const dia = fechaArg.getDate().toString().padStart(2, "0");
@@ -34,6 +34,9 @@ export default function HomePage() {
     }
   }
 
+  // ============================
+  // CARGAR VENTAS
+  // ============================
   async function cargarVentas() {
     setCargando(true);
     setError(null);
@@ -41,7 +44,7 @@ export default function HomePage() {
     try {
       const data = await fetchVentas(desde, hasta);
 
-      // 🔥 Formatear fechas antes de renderizar
+      // Normalizar fechas y agregar flag facturación
       const ventasConFecha = data.map((v: any) => ({
         ...v,
         fecha: formatearFecha(v.fecha),
@@ -59,8 +62,6 @@ export default function HomePage() {
   return (
     <div style={{ padding: "30px", maxWidth: "800px", margin: "auto" }}>
       <h1>📘 Facturación Loyverse + AFIP</h1>
-
-      <div className="bg-red-500 text-white p-4">TEST COLOR</div>
 
       <div style={{ marginBottom: "20px" }}>
         <h3>Seleccionar fechas:</h3>
@@ -109,9 +110,21 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* ============================
+          LISTA DE VENTAS
+      ============================ */}
       <div>
         {ventas.map((v, i) => (
-          <VentaCard key={i} venta={v} />
+          <VentaCard
+            key={i}
+            venta={v}
+            onFacturada={() => {
+              // 🔥 Actualizar venta como facturada
+              const copia = [...ventas];
+              copia[i].already_invoiced = true;
+              setVentas(copia);
+            }}
+          />
         ))}
       </div>
     </div>
