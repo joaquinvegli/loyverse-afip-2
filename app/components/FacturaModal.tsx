@@ -2,15 +2,37 @@
 
 import { useEffect, useState } from "react";
 
-// Tipado de props
-interface FacturaModalProps {
+type VentaItem = {
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+};
+
+type Venta = {
+  receipt_id: string;
+  fecha: string;
+  total: number;
+  items: VentaItem[];
+  cliente_id?: string | null;
+};
+
+type Cliente = {
+  exists?: boolean;
+  id: string | null;
+  name: string;
+  email: string;
+  phone?: string;
+  dni: string | null;
+};
+
+type FacturaModalProps = {
   open: boolean;
   onClose: () => void;
-  venta: any;
-  cliente: any;
+  venta: Venta;
+  cliente: Cliente | null;
   onEmailChange: (email: string) => void;
   onFacturar: () => void;
-}
+};
 
 export default function FacturaModal({
   open,
@@ -20,12 +42,13 @@ export default function FacturaModal({
   onEmailChange,
   onFacturar,
 }: FacturaModalProps) {
+  const [localCliente, setLocalCliente] = useState<Cliente | null>(null);
 
-  const [localCliente, setLocalCliente] = useState<any>(null);
-
-  // Sincronizar datos cuando cambia el cliente
+  // Sincronizar cuando llega un cliente nuevo
   useEffect(() => {
-    if (cliente) setLocalCliente(cliente);
+    if (cliente) {
+      setLocalCliente(cliente);
+    }
   }, [cliente]);
 
   if (!open || !localCliente) return null;
@@ -36,7 +59,6 @@ export default function FacturaModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
       <div className="bg-white w-full max-w-md rounded-lg shadow-lg p-6 relative">
-
         {/* Cerrar modal */}
         <button
           onClick={onClose}
@@ -77,9 +99,9 @@ export default function FacturaModal({
             type="email"
             value={localCliente.email || ""}
             onChange={(e) => {
-              const newEmail = e.target.value;
-              setLocalCliente({ ...localCliente, email: newEmail });
-              onEmailChange(newEmail);
+              const nuevo = { ...localCliente, email: e.target.value };
+              setLocalCliente(nuevo);
+              onEmailChange(e.target.value);
             }}
             className="w-full border rounded p-2"
             placeholder="example@gmail.com"
@@ -102,8 +124,11 @@ export default function FacturaModal({
           <label className="block text-sm font-semibold">Productos:</label>
 
           <div className="border rounded p-2 max-h-32 overflow-y-auto bg-gray-50">
-            {items.map((item: any, i: number) => (
-              <div key={i} className="flex justify-between text-sm border-b py-1">
+            {items.map((item, i) => (
+              <div
+                key={i}
+                className="flex justify-between text-sm border-b py-1"
+              >
                 <span>{item.nombre}</span>
                 <span>
                   {item.cantidad} x ${item.precio_unitario}
@@ -127,7 +152,6 @@ export default function FacturaModal({
         >
           Generar Factura
         </button>
-
       </div>
     </div>
   );
