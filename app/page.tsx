@@ -45,6 +45,7 @@ export default function HomePage() {
       const ventasConFecha = data.map((v: any) => ({
         ...v,
         fecha: formatearFecha(v.fecha),
+        already_invoiced: v.already_invoiced ?? false,
       }));
 
       setVentas(ventasConFecha);
