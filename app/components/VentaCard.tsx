@@ -17,9 +17,6 @@ export default function VentaCard({
   const [modalOpen, setModalOpen] = useState(false);
   const [cliente, setCliente] = useState<any>(null);
 
-  // ==============================
-  // Abrir modal (solo si no está facturada)
-  // ==============================
   async function abrirModal() {
     if (yaFacturada) return;
 
@@ -44,9 +41,6 @@ export default function VentaCard({
     setModalOpen(false);
   }
 
-  // ==============================
-  // Abrir PDF desde Google Drive
-  // ==============================
   function abrirPdfDrive() {
     if (!invoice?.drive_url) {
       alert("No se encontró el PDF en Google Drive.");
@@ -55,9 +49,6 @@ export default function VentaCard({
     window.open(invoice.drive_url, "_blank");
   }
 
-  // ==============================
-  // Generar factura (AFIP + Drive)
-  // ==============================
   async function generarFactura() {
     if (!cliente) {
       alert("No se pudo cargar el cliente.");
@@ -65,7 +56,7 @@ export default function VentaCard({
     }
 
     try {
-      const payload = {
+      const resp = await facturarVenta({
         receipt_id: venta.receipt_id,
         cliente: {
           id: cliente.id,
@@ -75,11 +66,9 @@ export default function VentaCard({
         },
         items: venta.items,
         total: venta.total,
-      };
+      });
 
-      const resp = await facturarVenta(payload);
-
-      // Abrir PDF que viene en base64 (solo esta vez)
+      // ABRIR PDF SOLO LA PRIMER VEZ
       if (resp.pdf_base64) {
         try {
           const byteChars = atob(resp.pdf_base64);
@@ -110,9 +99,7 @@ export default function VentaCard({
     }
   }
 
-  // ==============================
-  // Método de pago (badge)
-  // ==============================
+  // Método de pago
   const pagos = Array.isArray(venta.pagos) ? venta.pagos : [];
   const pagoPrincipal = pagos[0] ?? null;
 
@@ -138,33 +125,23 @@ export default function VentaCard({
         (color = "bg-purple-200 text-purple-800");
 
     return (
-      <span
-        className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${color}`}
-      >
+      <span className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${color}`}>
         {label}
       </span>
     );
   }
 
-  // ==============================
-  // UI
-  // ==============================
   return (
     <div className="border p-4 rounded shadow-md bg-white relative">
       <h3 className="font-bold text-lg">Venta #{venta.receipt_id}</h3>
       <p className="text-sm">{venta.fecha}</p>
 
-      {/* ==============================
-          BADGE FACTURADA + TOOLTIP
-      =============================== */}
       {yaFacturada && (
         <div className="relative inline-block group mt-1">
-          {/* Badge */}
           <span className="inline-block bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full cursor-pointer">
             ✓ Facturada #{invoice?.cbte_nro || ""}
           </span>
 
-          {/* Tooltip */}
           <div
             className="absolute left-0 top-7 hidden group-hover:block bg-black text-white text-xs p-2 rounded shadow-lg whitespace-pre-line z-50 border border-gray-700"
             style={{ minWidth: "180px" }}
@@ -180,29 +157,22 @@ Vto CAE: ${invoice?.vencimiento}`}
         </div>
       )}
 
-      {/* Medio de pago */}
       <div className="mt-2">{metodoBadge()}</div>
 
       <p className="font-semibold mt-2">Total: ${venta.total}</p>
 
-      {/* ==============================
-          BOTONES
-      =============================== */}
       <div className="flex gap-2 mt-3">
-        {/* BOTÓN FACTURAR */}
+
         <button
           disabled={yaFacturada}
           onClick={abrirModal}
           className={`px-3 py-2 rounded text-white ${
-            yaFacturada
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
+            yaFacturada ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
           }`}
         >
           {yaFacturada ? "Facturada" : "Facturar"}
         </button>
 
-        {/* BOTÓN VER PDF (Drive) */}
         {yaFacturada && invoice?.drive_url && (
           <button
             onClick={abrirPdfDrive}
@@ -213,15 +183,12 @@ Vto CAE: ${invoice?.vencimiento}`}
         )}
       </div>
 
-      {/* Modal */}
       <FacturaModal
         open={modalOpen}
         onClose={cerrarModal}
         venta={venta}
         cliente={cliente}
-        onEmailChange={(email) =>
-          setCliente((c: any) => ({ ...c, email }))
-        }
+        onEmailChange={(email) => setCliente((c: any) => ({ ...c, email }))}
         onFacturar={generarFactura}
       />
     </div>
