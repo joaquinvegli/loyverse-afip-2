@@ -4,6 +4,36 @@ import { useState } from "react";
 import FacturaModal from "./FacturaModal";
 import { fetchCliente, facturarVenta } from "../lib/api";
 
+// --- Toast bonito simple (sin librerías) ---
+const showToast = (msg: string) => {
+  const toast = document.createElement("div");
+  toast.innerText = msg;
+  toast.style.position = "fixed";
+  toast.style.bottom = "30px";
+  toast.style.right = "30px";
+  toast.style.padding = "12px 18px";
+  toast.style.background = "rgba(0,0,0,0.8)";
+  toast.style.color = "white";
+  toast.style.borderRadius = "8px";
+  toast.style.fontSize = "14px";
+  toast.style.zIndex = "9999";
+  toast.style.opacity = "0";
+  toast.style.transition = "opacity 0.4s";
+
+  document.body.appendChild(toast);
+
+  // Fade in
+  setTimeout(() => {
+    toast.style.opacity = "1";
+  }, 50);
+
+  // Fade out + remove
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 400);
+  }, 2500);
+};
+
 export default function VentaCard({
   venta,
   onFacturada,
@@ -68,7 +98,7 @@ export default function VentaCard({
         total: venta.total,
       });
 
-      // ABRIR PDF SOLO LA PRIMER VEZ
+      // abrir pdf base64 solo la primera vez
       if (resp.pdf_base64) {
         try {
           const byteChars = atob(resp.pdf_base64);
@@ -99,6 +129,39 @@ export default function VentaCard({
     }
   }
 
+  // =========================
+  // 🔥 NUEVO: ENVIAR POR MAIL
+  // =========================
+  async function enviarEmail() {
+    if (!cliente || !cliente.email || cliente.email.trim() === "") {
+      alert("Ingresá un email válido para enviar la factura.");
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/enviar_email`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            receipt_id: venta.receipt_id,
+            email: cliente.email, // toma el email TAL CUAL esté en el modal
+          }),
+        }
+      );
+
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data.detail || "Error desconocido al enviar email");
+      }
+
+      showToast("📧 Email enviado correctamente ✨");
+    } catch (error: any) {
+      alert("Error al enviar email: " + error.message);
+    }
+  }
+
   // Método de pago
   const pagos = Array.isArray(venta.pagos) ? venta.pagos : [];
   const pagoPrincipal = pagos[0] ?? null;
@@ -125,7 +188,9 @@ export default function VentaCard({
         (color = "bg-purple-200 text-purple-800");
 
     return (
-      <span className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${color}`}>
+      <span
+        className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${color}`}
+      >
         {label}
       </span>
     );
@@ -167,7 +232,9 @@ Vto CAE: ${invoice?.vencimiento}`}
           disabled={yaFacturada}
           onClick={abrirModal}
           className={`px-3 py-2 rounded text-white ${
-            yaFacturada ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+            yaFacturada
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
           }`}
         >
           {yaFacturada ? "Facturada" : "Facturar"}
@@ -179,6 +246,16 @@ Vto CAE: ${invoice?.vencimiento}`}
             className="px-3 py-2 bg-gray-800 text-white rounded hover:bg-black"
           >
             Ver PDF
+          </button>
+        )}
+
+        {/* 🟢 NUEVO BOTÓN ENVIAR EMAIL */}
+        {yaFacturada && (
+          <button
+            onClick={enviarEmail}
+            className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Enviar por mail
           </button>
         )}
       </div>
