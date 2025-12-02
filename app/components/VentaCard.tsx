@@ -4,7 +4,7 @@ import { useState } from "react";
 import FacturaModal from "./FacturaModal";
 import { fetchCliente, facturarVenta } from "../lib/api";
 
-// --- Toast bonito simple (sin librerías) ---
+// --- Toast bonito ---
 const showToast = (msg: string) => {
   const toast = document.createElement("div");
   toast.innerText = msg;
@@ -22,34 +22,23 @@ const showToast = (msg: string) => {
 
   document.body.appendChild(toast);
 
-  setTimeout(() => {
-    toast.style.opacity = "1";
-  }, 50);
-
+  setTimeout(() => (toast.style.opacity = "1"), 50);
   setTimeout(() => {
     toast.style.opacity = "0";
     setTimeout(() => toast.remove(), 400);
   }, 2500);
 };
 
-export default function VentaCard({
-  venta,
-  onFacturada,
-}: {
-  venta: any;
-  onFacturada: () => void;
-}) {
-  const yaFacturada = venta.already_invoiced === true;
-  const invoice = venta.invoice;
-
+export default function VentaCard({ venta, onFacturada }: any) {
   const [modalOpen, setModalOpen] = useState(false);
   const [cliente, setCliente] = useState<any>(null);
 
-  // NUEVO → controla si se abre el cuadro de envío de mail
-  const [mostrarEmailBox, setMostrarEmailBox] = useState(false);
+  const [invoice, setInvoice] = useState(venta.invoice); // 🔥 guarda factura localmente
+  const yaFacturada = venta.already_invoiced === true;
 
-  // NUEVO → email editable
+  const [mostrarEmailBox, setMostrarEmailBox] = useState(false);
   const [emailAEnviar, setEmailAEnviar] = useState("");
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
 
   async function abrirModal() {
     if (yaFacturada) return;
@@ -102,13 +91,11 @@ export default function VentaCard({
         total: venta.total,
       });
 
+      // Mostrar PDF local
       if (resp.pdf_base64) {
         try {
           const byteChars = atob(resp.pdf_base64);
-          const byteNumbers = new Array(byteChars.length);
-          for (let i = 0; i < byteChars.length; i++) {
-            byteNumbers[i] = byteChars.charCodeAt(i);
-          }
+          const byteNumbers = Array.from(byteChars, c => c.charCodeAt(0));
           const byteArray = new Uint8Array(byteNumbers);
           const blob = new Blob([byteArray], { type: "application/pdf" });
           const url = URL.createObjectURL(blob);
@@ -118,12 +105,17 @@ export default function VentaCard({
         }
       }
 
-      onFacturada();
+      // 🔥 Actualizar factura local para que aparezca "Ver PDF"
+      setInvoice(resp.invoice);
+
+      // 🔥 Avisar al page.tsx
+      onFacturada(resp.invoice);
+
       setModalOpen(false);
     } catch (e: any) {
       if (e.message.includes("ya fue facturada")) {
         alert("Esta venta ya fue facturada anteriormente.");
-        onFacturada();
+        onFacturada(invoice);
         setModalOpen(false);
         return;
       }
@@ -133,7 +125,7 @@ export default function VentaCard({
   }
 
   // ========================================================
-  // 🔥 NUEVO: Enviar email (con confirmación y campo editable)
+  // Enviar email
   // ========================================================
   async function abrirEnviarMail() {
     if (!cliente) {
@@ -166,6 +158,8 @@ export default function VentaCard({
       return;
     }
 
+    setEnviandoEmail(true);
+
     try {
       const resp = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/enviar_email`,
@@ -188,6 +182,8 @@ export default function VentaCard({
       setMostrarEmailBox(false);
     } catch (error: any) {
       alert("Error al enviar email: " + error.message);
+    } finally {
+      setEnviandoEmail(false);
     }
   }
 
@@ -210,14 +206,14 @@ export default function VentaCard({
       (label = `Tarjeta (${pagoPrincipal.nombre})`),
         (color = "bg-blue-200 text-blue-800");
     else if (nombre.includes("MP") || nombre.includes("QR"))
-      (label = "Mercado Pago / QR"), (color = "bg-cyan-200 text-cyan-800");
+      (label = "Mercado Pago / QR"),
+        (color = "bg-cyan-200 text-cyan-800");
     else if (nombre.includes("TRANSFER"))
-      (label = "Transferencia"), (color = "bg-purple-200 text-purple-800");
+      (label = "Transferencia"),
+        (color = "bg-purple-200 text-purple-800");
 
     return (
-      <span
-        className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${color}`}
-      >
+      <span className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${color}`}>
         {label}
       </span>
     );
@@ -228,7 +224,7 @@ export default function VentaCard({
       <h3 className="font-bold text-lg">Venta #{venta.receipt_id}</h3>
       <p className="text-sm">{venta.fecha}</p>
 
-      {yaFacturada && (
+      {yaFacturada && invoice && (
         <div className="relative inline-block group mt-1">
           <span className="inline-block bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full cursor-pointer">
             ✓ Facturada #{invoice?.cbte_nro || ""}
@@ -258,15 +254,13 @@ Vto CAE: ${invoice?.vencimiento}`}
           disabled={yaFacturada}
           onClick={abrirModal}
           className={`px-3 py-2 rounded text-white ${
-            yaFacturada
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
+            yaFacturada ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
           }`}
         >
           {yaFacturada ? "Facturada" : "Facturar"}
         </button>
 
-        {yaFacturada && invoice?.drive_url && (
+        {invoice?.drive_url && (
           <button
             onClick={abrirPdfDrive}
             className="px-3 py-2 bg-gray-800 text-white rounded hover:bg-black"
@@ -287,9 +281,7 @@ Vto CAE: ${invoice?.vencimiento}`}
 
       {mostrarEmailBox && (
         <div className="mt-3 p-3 border rounded bg-gray-50">
-          <label className="block text-sm font-semibold mb-1">
-            Email del cliente:
-          </label>
+          <label className="block text-sm font-semibold mb-1">Email del cliente:</label>
           <input
             type="email"
             value={emailAEnviar}
@@ -300,9 +292,14 @@ Vto CAE: ${invoice?.vencimiento}`}
 
           <button
             onClick={confirmarEnvioEmail}
-            className="w-full py-2 bg-green-700 text-white rounded hover:bg-green-800"
+            disabled={enviandoEmail}
+            className={`w-full py-2 rounded text-white transition ${
+              enviandoEmail
+                ? "bg-green-400 cursor-not-allowed"
+                : "bg-green-700 hover:bg-green-800"
+            }`}
           >
-            Confirmar envío
+            {enviandoEmail ? "Enviando…" : "Confirmar envío"}
           </button>
         </div>
       )}

@@ -1,24 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import VentaCard from "./components/VentaCard";
 import { fetchVentas } from "./lib/api";
 
 export default function HomePage() {
-  const [desde, setDesde] = useState("2025-11-26");
-  const [hasta, setHasta] = useState("2025-11-27");
+  // ============================
+  // FECHA HOY (YYYY-MM-DD)
+  // ============================
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dd = String(hoy.getDate()).padStart(2, "0");
+  const hoyStr = `${yyyy}-${mm}-${dd}`;
+
+  const [desde, setDesde] = useState(hoyStr);
+  const [hasta, setHasta] = useState(hoyStr);
   const [ventas, setVentas] = useState<any[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ============================
-  // FORMATEO DE FECHA (UTC → ARG)
+  // FORMATEO FECHA UTC → ARG
   // ============================
   function formatearFecha(fechaISO: string) {
     try {
       const fecha = new Date(fechaISO);
 
-      // Ajuste manual UTC-3
+      // Ajuste a UTC-3 manual
       const fechaArg = new Date(fecha.getTime() - 3 * 60 * 60 * 1000);
 
       const dia = fechaArg.getDate().toString().padStart(2, "0");
@@ -44,13 +53,13 @@ export default function HomePage() {
     try {
       const data = await fetchVentas(desde, hasta);
 
-      // Normalizar fechas y agregar flag facturación
       const ventasConFecha = data.map((v: any) => ({
         ...v,
         fecha: formatearFecha(v.fecha),
         already_invoiced: v.already_invoiced ?? false,
       }));
 
+      // 🔥 Limpia la lista y vuelve a cargar solo las actuales
       setVentas(ventasConFecha);
     } catch (e: any) {
       setError("Error cargando ventas: " + e.message);
@@ -59,47 +68,78 @@ export default function HomePage() {
     }
   }
 
+  // ============================
+  // AUTO-CARGAR AL ENTRAR
+  // ============================
+  useEffect(() => {
+    cargarVentas();
+  }, []);
+
   return (
-    <div style={{ padding: "30px", maxWidth: "800px", margin: "auto" }}>
-      <h1>📘 Facturación Loyverse + AFIP</h1>
+    <div style={{ padding: "30px", maxWidth: "900px", margin: "auto" }}>
+      <h1 style={{ marginBottom: "20px" }}>📘 Facturación Loyverse + AFIP</h1>
 
-      <div style={{ marginBottom: "20px" }}>
-        <h3>Seleccionar fechas:</h3>
+      {/* ============================
+          CALENDARIOS
+      ============================ */}
+      <div
+        style={{
+          padding: "15px",
+          borderRadius: "12px",
+          background: "#f8f8f8",
+          marginBottom: "20px",
+          border: "1px solid #ddd",
+        }}
+      >
+        <h3 style={{ marginBottom: "10px" }}>Seleccionar fechas:</h3>
 
-        <label>
-          Desde:
-          <input
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            style={{ marginLeft: "10px" }}
-          />
-        </label>
+        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <label style={{ fontWeight: "bold", marginBottom: "4px" }}>
+              Desde:
+            </label>
+            <input
+              type="date"
+              value={desde}
+              onChange={(e) => setDesde(e.target.value)}
+              style={{
+                padding: "8px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                fontSize: "16px",
+              }}
+            />
+          </div>
 
-        <br />
-
-        <label>
-          Hasta:
-          <input
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            style={{ marginLeft: "10px" }}
-          />
-        </label>
-
-        <br />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <label style={{ fontWeight: "bold", marginBottom: "4px" }}>
+              Hasta:
+            </label>
+            <input
+              type="date"
+              value={hasta}
+              onChange={(e) => setHasta(e.target.value)}
+              style={{
+                padding: "8px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                fontSize: "16px",
+              }}
+            />
+          </div>
+        </div>
 
         <button
           onClick={cargarVentas}
           style={{
             marginTop: "15px",
-            padding: "10px 15px",
-            background: "green",
+            padding: "10px 20px",
+            background: "#007f2d",
             color: "white",
-            borderRadius: "6px",
+            borderRadius: "8px",
             border: "none",
             cursor: "pointer",
+            fontSize: "16px",
           }}
         >
           {cargando ? "Cargando..." : "Ver ventas"}
@@ -119,10 +159,8 @@ export default function HomePage() {
             key={i}
             venta={v}
             onFacturada={() => {
-              // 🔥 Actualizar venta como facturada
-              const copia = [...ventas];
-              copia[i].already_invoiced = true;
-              setVentas(copia);
+              // 🔥 Vuelve a cargar ventas para mostrar el botón "Ver PDF"
+              cargarVentas();
             }}
           />
         ))}
