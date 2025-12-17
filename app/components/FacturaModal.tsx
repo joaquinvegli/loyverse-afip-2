@@ -1,173 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type VentaItem = {
-  nombre: string;
-  cantidad: number;
-  precio_unitario: number;
-};
-
-type Venta = {
-  receipt_id: string;
-  fecha: string;
-  total: number;
-  items: VentaItem[];
-  cliente_id?: string | null;
-};
-
-type Cliente = {
-  exists?: boolean;
-  id: string | null;
-  name: string;
-  email: string;
-  phone?: string;
-  dni: string | null;
-};
-
-type FacturaModalProps = {
-  open: boolean;
-  onClose: () => void;
-  venta: Venta;
-  cliente: Cliente | null;
-  onEmailChange: (email: string) => void;
-  onFacturar: () => void;
-};
+import { useState } from "react";
 
 export default function FacturaModal({
   open,
   onClose,
   venta,
   cliente,
-  onEmailChange,
   onFacturar,
-}: FacturaModalProps) {
-  const [localCliente, setLocalCliente] = useState<Cliente | null>(null);
+}: any) {
   const [loading, setLoading] = useState(false);
 
-  // Sincronizar cuando llega un cliente nuevo
-  useEffect(() => {
-    if (cliente) {
-      setLocalCliente(cliente);
-    }
-  }, [cliente]);
+  if (!open) return null;
 
-  if (!open || !localCliente) return null;
-
-  const items = venta?.items || [];
-  const total = venta?.total || 0;
-
-  const handleFacturarClick = async () => {
+  async function confirmar() {
     setLoading(true);
-    try {
-      await onFacturar();
-    } finally {
-      setLoading(false);
-    }
-  };
+    await onFacturar();
+    setLoading(false);
+  }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-      <div className="bg-white w-full max-w-md rounded-lg shadow-lg p-6 relative">
-        {/* Cerrar modal */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-        >
-          ✖
-        </button>
-
-        <h2 className="text-xl font-bold mb-4">
-          Facturar Venta #{venta?.receipt_id}
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white w-full max-w-md rounded p-4 space-y-3">
+        <h2 className="font-bold text-lg">
+          Facturar #{venta.receipt_id}
         </h2>
 
-        {/* Cliente */}
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">Cliente:</label>
-          <p className="text-gray-800">
-            {localCliente.name || "Consumidor Final"}
-          </p>
+        <p className="text-sm">
+          Cliente: {cliente?.name || "Consumidor Final"}
+        </p>
+
+        <div className="border rounded p-2 max-h-40 overflow-y-auto text-sm">
+          {venta.items_facturables.map((i: any, idx: number) => (
+            <div key={idx} className="flex justify-between">
+              <span>{i.nombre}</span>
+              <span>
+                {i.cantidad} × ${i.precio_unitario}
+              </span>
+            </div>
+          ))}
         </div>
 
-        {/* DNI */}
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">DNI:</label>
-          <input
-            type="text"
-            value={localCliente.dni || ""}
-            readOnly
-            className="w-full border rounded p-2 bg-gray-100"
-          />
-        </div>
+        <p className="font-semibold">
+          Total a facturar: ${venta.max_facturable}
+        </p>
 
-        {/* Email editable */}
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">
-            Email (para enviar factura):
-          </label>
-          <input
-            type="email"
-            value={localCliente.email || ""}
-            onChange={(e) => {
-              const nuevo = { ...localCliente, email: e.target.value };
-              setLocalCliente(nuevo);
-              onEmailChange(e.target.value);
-            }}
-            className="w-full border rounded p-2"
-            placeholder="example@gmail.com"
-          />
-        </div>
-
-        {/* Teléfono */}
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">Teléfono:</label>
-          <input
-            type="text"
-            value={localCliente.phone || ""}
-            readOnly
-            className="w-full border rounded p-2 bg-gray-100"
-          />
-        </div>
-
-        {/* Productos */}
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">Productos:</label>
-
-          <div className="border rounded p-2 max-h-32 overflow-y-auto bg-gray-50">
-            {items.map((item, i) => (
-              <div
-                key={i}
-                className="flex justify-between text-sm border-b py-1"
-              >
-                <span>{item.nombre}</span>
-                <span>
-                  {item.cantidad} x ${item.precio_unitario}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Total */}
-        <div className="mb-4">
-          <p className="text-lg font-semibold">
-            Total: <span className="text-green-700">${total}</span>
-          </p>
-        </div>
-
-        {/* Botón Facturar */}
         <button
-          onClick={handleFacturarClick}
           disabled={loading}
-          className={`w-full py-2 rounded text-white transition-all
-            ${
-              loading
-                ? "bg-blue-400 opacity-60 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700"
-            }
-          `}
+          onClick={confirmar}
+          className="w-full bg-blue-600 text-white py-2 rounded"
         >
-          {loading ? "Cargando…" : "Generar Factura"}
+          {loading ? "Generando…" : "Confirmar factura"}
+        </button>
+
+        <button
+          onClick={onClose}
+          className="w-full text-sm text-gray-500"
+        >
+          Cancelar
         </button>
       </div>
     </div>
