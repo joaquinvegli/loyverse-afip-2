@@ -19,8 +19,6 @@ export default function HomePage() {
   const [modoSeleccion, setModoSeleccion] = useState(false);
   const [facturandoMasivo, setFacturandoMasivo] = useState(false);
   const [progresoMasivo, setProgresoMasivo] = useState<string[]>([]);
-
-  // Ref para acceder al progreso actualizado dentro del loop
   const progresoRef = useRef<string[]>([]);
 
   function formatearFecha(fechaISO: string) {
@@ -89,7 +87,6 @@ export default function HomePage() {
     progresoRef.current = [];
     setProgresoMasivo([]);
 
-    // Capturamos la lista de seleccionadas antes del loop
     const ids = [...seleccionadas];
     const facturadas_ok: string[] = [];
 
@@ -102,11 +99,12 @@ export default function HomePage() {
         progresoRef.current = nuevoProg;
         setProgresoMasivo([...nuevoProg]);
 
-        let clienteData = { id: null, name: "Consumidor Final", email: "", dni: null };
-        if (venta.cliente_id) {
-          const data = await fetchCliente(venta.cliente_id);
-          if (data) clienteData = data;
-        }
+        const clienteData = {
+          id: venta.cliente_id ?? null,
+          name: venta.cliente_nombre || "Consumidor Final",
+          email: venta.cliente_email || "",
+          dni: venta.cliente_dni ?? null,
+        };
 
         await facturarVenta({
           receipt_id,
@@ -132,7 +130,6 @@ export default function HomePage() {
       }
     }
 
-    // Actualizar visualmente las ventas facturadas sin esperar recarga
     if (facturadas_ok.length > 0) {
       setVentas(prev => prev.map(v =>
         facturadas_ok.includes(v.receipt_id)
@@ -144,8 +141,6 @@ export default function HomePage() {
     setFacturandoMasivo(false);
     setSeleccionadas([]);
     setModoSeleccion(false);
-
-    // Recarga completa para traer números de factura y PDFs
     await cargarVentas();
   }
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import FacturaModal from "./FacturaModal";
-import { fetchCliente, facturarVenta } from "../lib/api";
+import { facturarVenta } from "../lib/api";
 
 const showToast = (msg: string) => {
   const toast = document.createElement("div");
@@ -37,13 +37,13 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
 
   async function abrirModal() {
     if (yaFacturada || esReembolso) return;
+    setCliente({
+      id: venta.cliente_id ?? null,
+      name: venta.cliente_nombre || "Consumidor Final",
+      email: venta.cliente_email || "",
+      dni: venta.cliente_dni ?? null,
+    });
     setModalOpen(true);
-    if (venta.cliente_id) {
-      const data = await fetchCliente(venta.cliente_id);
-      setCliente(data);
-    } else {
-      setCliente({ id: null, name: "Consumidor Final", email: "", dni: null });
-    }
   }
 
   async function generarFactura() {
@@ -65,14 +65,8 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
   }
 
   async function abrirEnviarMail() {
-    const emailInicial = invoice?.email_cliente || cliente?.email || "";
-    if (!emailInicial && venta.cliente_id) {
-      const data = await fetchCliente(venta.cliente_id);
-      setCliente(data);
-      setEmailAEnviar(data?.email || "");
-    } else {
-      setEmailAEnviar(emailInicial);
-    }
+    const emailInicial = invoice?.email_cliente || venta.cliente_email || "";
+    setEmailAEnviar(emailInicial);
     setMostrarEmailBox(true);
   }
 
@@ -127,20 +121,20 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
   }
 
   return (
-    <div className={`relative bg-white rounded-2xl shadow border p-4 transition ${
-      modoSeleccion && !esReembolso && !yaFacturada
-        ? seleccionada
-          ? "border-blue-400 bg-blue-50"
-          : "border-gray-200 hover:border-blue-300"
-        : esReembolso
-        ? "border-red-200 bg-red-50"
-        : yaFacturada
-        ? "border-green-200"
-        : "border-gray-100"
-    }`}
+    <div
+      className={`relative bg-white rounded-2xl shadow border p-4 transition ${
+        modoSeleccion && !esReembolso && !yaFacturada
+          ? seleccionada
+            ? "border-blue-400 bg-blue-50"
+            : "border-gray-200 hover:border-blue-300"
+          : esReembolso
+          ? "border-red-200 bg-red-50"
+          : yaFacturada
+          ? "border-green-200"
+          : "border-gray-100"
+      }`}
       onClick={modoSeleccion && !esReembolso && !yaFacturada ? onToggleSeleccion : undefined}
     >
-
       {/* CHECKBOX SELECCIÓN MASIVA */}
       {modoSeleccion && !esReembolso && !yaFacturada && (
         <div className={`absolute top-3 right-3 w-7 h-7 rounded-full border-2 flex items-center justify-center transition ${
@@ -176,7 +170,15 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
 
       {/* CLIENTE */}
       {venta.cliente_nombre && venta.cliente_nombre !== "Consumidor Final" && (
-        <p className="text-sm text-gray-600 mt-1">👤 {venta.cliente_nombre}</p>
+        <div className="mt-1 space-y-0.5">
+          <p className="text-sm text-gray-600">👤 {venta.cliente_nombre}</p>
+          {venta.cliente_email && (
+            <p className="text-xs text-gray-400">✉️ {venta.cliente_email}</p>
+          )}
+          {venta.cliente_dni && (
+            <p className="text-xs text-gray-400">🪪 DNI: {venta.cliente_dni}</p>
+          )}
+        </div>
       )}
 
       {/* REEMBOLSO INFO */}
@@ -191,7 +193,7 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
         {metodoBadges()}
       </div>
 
-      {/* BOTONES — ocultos en modo selección */}
+      {/* BOTONES */}
       {!modoSeleccion && (
         <div className="grid grid-cols-3 gap-2 mt-4">
           <button
