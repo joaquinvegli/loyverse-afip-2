@@ -14,6 +14,7 @@ export default function HomePage() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mostrarInfoPendientes, setMostrarInfoPendientes] = useState(false);
+  const [conectando, setConectando] = useState(true);
 
   const [seleccionadas, setSeleccionadas] = useState<string[]>([]);
   const [modoSeleccion, setModoSeleccion] = useState(false);
@@ -56,13 +57,33 @@ export default function HomePage() {
     }
   }
 
-  // Despertar Render apenas carga la página
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/health`)
-      .catch(() => {});
-  }, []);
+    async function despertarYCargar() {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      setConectando(true);
 
-  useEffect(() => { cargarVentas(); }, []);
+      for (let i = 0; i < 10; i++) {
+        try {
+          const resp = await fetch(`${backendUrl}/health`, {
+            signal: AbortSignal.timeout(5000),
+          });
+          if (resp.ok) {
+            setConectando(false);
+            await cargarVentas();
+            return;
+          }
+        } catch {
+          // Sigue durmiendo, esperar y reintentar
+        }
+        await new Promise(res => setTimeout(res, 3000));
+      }
+
+      setConectando(false);
+      setError("No se pudo conectar con el servidor. Intentá recargar la página.");
+    }
+
+    despertarYCargar();
+  }, []);
 
   const ventasSolo = ventas.filter(v => v.receipt_type !== "REFUND");
   const totalVentas = ventasSolo.length;
@@ -172,6 +193,16 @@ export default function HomePage() {
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
 
+        {/* BANNER CONECTANDO */}
+        {conectando && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 flex items-center gap-3">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />
+            <p className="text-sm text-blue-700 font-medium">
+              Conectando con el servidor, puede demorar unos segundos...
+            </p>
+          </div>
+        )}
+
         {/* FILTRO DE FECHAS */}
         <div className="bg-white rounded-2xl shadow p-5 border border-gray-100">
           <h2 className="text-base font-semibold text-gray-700 mb-4">📅 Seleccionar período</h2>
@@ -197,7 +228,7 @@ export default function HomePage() {
           </div>
           <button
             onClick={cargarVentas}
-            disabled={cargando}
+            disabled={cargando || conectando}
             className="mt-4 w-full py-3 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white font-semibold rounded-xl text-base transition disabled:opacity-60"
           >
             {cargando ? "⏳ Cargando..." : "🔍 Ver ventas"}
@@ -300,7 +331,7 @@ export default function HomePage() {
         )}
 
         {/* LISTA */}
-        {ventas.length === 0 && !cargando && (
+        {ventas.length === 0 && !cargando && !conectando && (
           <div className="text-center py-12 text-gray-400">
             <p className="text-4xl mb-3">📭</p>
             <p className="text-base">No hay ventas para este período</p>
