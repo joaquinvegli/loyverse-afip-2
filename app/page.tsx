@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import VentaCard from "./components/VentaCard";
-import { fetchVentas, fetchCliente, facturarVenta } from "./lib/api";
+import { fetchVentas, facturarVenta } from "./lib/api";
 
 export default function HomePage() {
   const hoy = new Date();
@@ -55,6 +55,12 @@ export default function HomePage() {
       setCargando(false);
     }
   }
+
+  // Despertar Render apenas carga la página
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/health`)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => { cargarVentas(); }, []);
 
@@ -222,7 +228,7 @@ export default function HomePage() {
               </button>
               {mostrarInfoPendientes && (
                 <div className="absolute top-10 right-0 z-10 bg-white border border-gray-200 rounded-xl shadow-lg p-3 text-left text-xs text-gray-600 w-52">
-                  Solo cuenta ventas <strong>no facturadas</strong> que <strong>no son exclusivamente en efectivo</strong>. Las ventas en efectivo no requieren factura obligatoria.
+                  Solo cuenta ventas <strong>no facturadas</strong> que <strong>no son exclusivamente en efectivo</strong>.
                   <button
                     onClick={() => setMostrarInfoPendientes(false)}
                     className="mt-2 text-blue-600 font-semibold block"
