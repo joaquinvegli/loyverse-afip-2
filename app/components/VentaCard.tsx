@@ -22,7 +22,7 @@ const showToast = (msg: string) => {
   }, 2500);
 };
 
-export default function VentaCard({ venta, onFacturada }: any) {
+export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccionada, onToggleSeleccion }: any) {
   const esReembolso = venta.receipt_type === "REFUND";
   const [modalOpen, setModalOpen] = useState(false);
   const [cliente, setCliente] = useState<any>(null);
@@ -127,10 +127,31 @@ export default function VentaCard({ venta, onFacturada }: any) {
   }
 
   return (
-    <div className={`bg-white rounded-2xl shadow border p-4 ${esReembolso ? "border-red-200 bg-red-50" : yaFacturada ? "border-green-200" : "border-gray-100"}`}>
+    <div className={`relative bg-white rounded-2xl shadow border p-4 transition ${
+      modoSeleccion && !esReembolso && !yaFacturada
+        ? seleccionada
+          ? "border-blue-400 bg-blue-50"
+          : "border-gray-200 hover:border-blue-300"
+        : esReembolso
+        ? "border-red-200 bg-red-50"
+        : yaFacturada
+        ? "border-green-200"
+        : "border-gray-100"
+    }`}
+      onClick={modoSeleccion && !esReembolso && !yaFacturada ? onToggleSeleccion : undefined}
+    >
+
+      {/* CHECKBOX SELECCIÓN MASIVA */}
+      {modoSeleccion && !esReembolso && !yaFacturada && (
+        <div className={`absolute top-3 right-3 w-7 h-7 rounded-full border-2 flex items-center justify-center transition ${
+          seleccionada ? "bg-blue-600 border-blue-600 text-white" : "border-gray-300 bg-white"
+        }`}>
+          {seleccionada && <span className="text-xs font-bold">✓</span>}
+        </div>
+      )}
 
       {/* CABECERA */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 pr-8">
         <div>
           <p className="text-xs text-gray-400 font-mono">#{venta.receipt_id}</p>
           <p className="text-sm text-gray-500 mt-0.5">{venta.fecha}</p>
@@ -170,46 +191,48 @@ export default function VentaCard({ venta, onFacturada }: any) {
         {metodoBadges()}
       </div>
 
-      {/* BOTONES */}
-      <div className="grid grid-cols-3 gap-2 mt-4">
-        <button
-          disabled={yaFacturada || esReembolso}
-          onClick={abrirModal}
-          className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
-            yaFacturada
-              ? "bg-green-100 text-green-700 cursor-not-allowed"
-              : esReembolso
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-          }`}
-        >
-          {yaFacturada ? "✓ Emitida" : "📄 Facturar"}
-        </button>
+      {/* BOTONES — ocultos en modo selección */}
+      {!modoSeleccion && (
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          <button
+            disabled={yaFacturada || esReembolso}
+            onClick={abrirModal}
+            className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
+              yaFacturada
+                ? "bg-green-100 text-green-700 cursor-not-allowed"
+                : esReembolso
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+            }`}
+          >
+            {yaFacturada ? "✓ Emitida" : "📄 Facturar"}
+          </button>
 
-        <button
-          disabled={!invoice?.drive_url}
-          onClick={() => invoice?.drive_url && window.open(invoice.drive_url, "_blank")}
-          className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
-            invoice?.drive_url
-              ? "bg-gray-800 hover:bg-gray-900 text-white shadow-sm"
-              : "bg-gray-100 text-gray-300 cursor-not-allowed"
-          }`}
-        >
-          🔍 Ver PDF
-        </button>
+          <button
+            disabled={!invoice?.drive_url}
+            onClick={() => invoice?.drive_url && window.open(invoice.drive_url, "_blank")}
+            className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
+              invoice?.drive_url
+                ? "bg-gray-800 hover:bg-gray-900 text-white shadow-sm"
+                : "bg-gray-100 text-gray-300 cursor-not-allowed"
+            }`}
+          >
+            🔍 Ver PDF
+          </button>
 
-        <button
-          disabled={!yaFacturada}
-          onClick={yaFacturada ? abrirEnviarMail : undefined}
-          className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
-            yaFacturada
-              ? "bg-green-600 hover:bg-green-700 text-white shadow-sm"
-              : "bg-gray-100 text-gray-300 cursor-not-allowed"
-          }`}
-        >
-          📧 Mail
-        </button>
-      </div>
+          <button
+            disabled={!yaFacturada}
+            onClick={yaFacturada ? abrirEnviarMail : undefined}
+            className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
+              yaFacturada
+                ? "bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                : "bg-gray-100 text-gray-300 cursor-not-allowed"
+            }`}
+          >
+            📧 Mail
+          </button>
+        </div>
+      )}
 
       {/* EMAIL BOX */}
       {mostrarEmailBox && (
