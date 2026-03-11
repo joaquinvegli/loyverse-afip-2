@@ -111,6 +111,7 @@ export default function HomePage() {
           email: venta.cliente_email || "",
           dni: venta.cliente_dni ?? null,
           cuit: venta.cliente_cuit ?? null,
+          domicilio: venta.cliente_domicilio ?? null,
         };
 
         await facturarVenta({
