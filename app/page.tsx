@@ -104,6 +104,7 @@ export default function HomePage() {
           name: venta.cliente_nombre || "Consumidor Final",
           email: venta.cliente_email || "",
           dni: venta.cliente_dni ?? null,
+          cuit: venta.cliente_cuit ?? null,
         };
 
         await facturarVenta({

@@ -35,6 +35,13 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
   const tieneReembolso = venta.refund_status === "PARTIAL" || venta.refund_status === "TOTAL";
   const pagos = Array.isArray(venta.pagos) ? venta.pagos : [];
 
+  // Etiqueta del documento del cliente para mostrar en la card
+  function docLabel() {
+    if (venta.cliente_cuit) return `🪪 CUIT/CUIL: ${venta.cliente_cuit}`;
+    if (venta.cliente_dni) return `🪪 DNI: ${venta.cliente_dni}`;
+    return null;
+  }
+
   async function abrirModal() {
     if (yaFacturada || esReembolso) return;
     setCliente({
@@ -42,6 +49,7 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
       name: venta.cliente_nombre || "Consumidor Final",
       email: venta.cliente_email || "",
       dni: venta.cliente_dni ?? null,
+      cuit: venta.cliente_cuit ?? null,
     });
     setModalOpen(true);
   }
@@ -51,7 +59,13 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
     try {
       const resp = await facturarVenta({
         receipt_id: venta.receipt_id,
-        cliente: { id: cliente.id, name: cliente.name, email: cliente.email, dni: cliente.dni },
+        cliente: {
+          id: cliente.id,
+          name: cliente.name,
+          email: cliente.email,
+          dni: cliente.dni,
+          cuit: cliente.cuit,
+        },
         items: venta.items_facturables ?? venta.items,
         total: venta.max_facturable ?? venta.total,
       });
@@ -175,8 +189,8 @@ export default function VentaCard({ venta, onFacturada, modoSeleccion, seleccion
           {venta.cliente_email && (
             <p className="text-xs text-gray-400">✉️ {venta.cliente_email}</p>
           )}
-          {venta.cliente_dni && (
-            <p className="text-xs text-gray-400">🪪 DNI: {venta.cliente_dni}</p>
+          {docLabel() && (
+            <p className="text-xs text-gray-400">{docLabel()}</p>
           )}
         </div>
       )}
