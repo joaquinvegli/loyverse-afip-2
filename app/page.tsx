@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import VentaCard from "./components/VentaCard";
 import { fetchVentas, fetchCliente, facturarVenta } from "./lib/api";
 
@@ -19,6 +19,9 @@ export default function HomePage() {
   const [modoSeleccion, setModoSeleccion] = useState(false);
   const [facturandoMasivo, setFacturandoMasivo] = useState(false);
   const [progresoMasivo, setProgresoMasivo] = useState<string[]>([]);
+
+  // Ref para acceder al progreso actualizado dentro del loop
+  const progresoRef = useRef<string[]>([]);
 
   function formatearFecha(fechaISO: string) {
     try {
@@ -43,6 +46,7 @@ export default function HomePage() {
       const data = await fetchVentas(desde, hasta);
       const ventasConFecha = data.map((v: any) => ({
         ...v,
+        fechaOriginal: v.fecha,
         fecha: formatearFecha(v.fecha),
         already_invoiced: v.already_invoiced ?? false,
       }));
@@ -82,14 +86,21 @@ export default function HomePage() {
   async function facturarMasivo() {
     if (seleccionadas.length === 0) return;
     setFacturandoMasivo(true);
+    progresoRef.current = [];
     setProgresoMasivo([]);
 
-    for (const receipt_id of seleccionadas) {
+    // Capturamos la lista de seleccionadas antes del loop
+    const ids = [...seleccionadas];
+    const facturadas_ok: string[] = [];
+
+    for (const receipt_id of ids) {
       const venta = ventas.find(v => v.receipt_id === receipt_id);
       if (!venta) continue;
 
       try {
-        setProgresoMasivo(prev => [...prev, `⏳ Facturando ${receipt_id}...`]);
+        const nuevoProg = [...progresoRef.current, `⏳ Facturando ${receipt_id}...`];
+        progresoRef.current = nuevoProg;
+        setProgresoMasivo([...nuevoProg]);
 
         let clienteData = { id: null, name: "Consumidor Final", email: "", dni: null };
         if (venta.cliente_id) {
@@ -104,19 +115,37 @@ export default function HomePage() {
           total: venta.max_facturable ?? venta.total,
         });
 
-        setProgresoMasivo(prev =>
-          prev.map(p => p.includes(receipt_id) ? `✅ ${receipt_id} facturada` : p)
+        facturadas_ok.push(receipt_id);
+
+        const progActualizado = progresoRef.current.map(p =>
+          p.includes(receipt_id) ? `✅ ${receipt_id} facturada` : p
         );
+        progresoRef.current = progActualizado;
+        setProgresoMasivo([...progActualizado]);
+
       } catch (e: any) {
-        setProgresoMasivo(prev =>
-          prev.map(p => p.includes(receipt_id) ? `❌ ${receipt_id}: ${e.message}` : p)
+        const progActualizado = progresoRef.current.map(p =>
+          p.includes(receipt_id) ? `❌ ${receipt_id}: ${e.message}` : p
         );
+        progresoRef.current = progActualizado;
+        setProgresoMasivo([...progActualizado]);
       }
+    }
+
+    // Actualizar visualmente las ventas facturadas sin esperar recarga
+    if (facturadas_ok.length > 0) {
+      setVentas(prev => prev.map(v =>
+        facturadas_ok.includes(v.receipt_id)
+          ? { ...v, already_invoiced: true }
+          : v
+      ));
     }
 
     setFacturandoMasivo(false);
     setSeleccionadas([]);
     setModoSeleccion(false);
+
+    // Recarga completa para traer números de factura y PDFs
     await cargarVentas();
   }
 
