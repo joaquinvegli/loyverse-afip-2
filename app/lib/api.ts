@@ -1,14 +1,12 @@
 // lib/api.ts
 
-// ===============================================
-// TIPOS
-// ===============================================
 export interface ClienteData {
   id?: string | null;
   name?: string | null;
   email?: string | null;
   dni?: string | null;
   cuit?: string | null;
+  domicilio?: string | null;
 }
 
 export interface ItemData {
@@ -24,9 +22,6 @@ export interface FacturaRequest {
   total: number;
 }
 
-// ===============================================
-// OBTENER VENTAS ENTRE FECHAS
-// ===============================================
 export async function fetchVentas(desde: string, hasta: string) {
   const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/ventas?desde=${desde}&hasta=${hasta}`;
   const resp = await fetch(url);
@@ -34,9 +29,6 @@ export async function fetchVentas(desde: string, hasta: string) {
   return resp.json();
 }
 
-// ===============================================
-// OBTENER CLIENTE POR ID (ya no se usa, se mantiene por compatibilidad)
-// ===============================================
 export async function fetchCliente(id: string) {
   const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/clientes/${id}`;
   const resp = await fetch(url);
@@ -44,22 +36,16 @@ export async function fetchCliente(id: string) {
   return resp.json();
 }
 
-// ===============================================
-// FACTURAR VENTA
-// ===============================================
 export async function facturarVenta(data: FacturaRequest) {
   const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/facturar`;
-
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
     throw new Error(err.detail || "Error al facturar");
   }
-
   return resp.json();
 }
