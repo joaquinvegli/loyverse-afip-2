@@ -1,143 +1,93 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-type VentaItem = {
-  nombre: string;
-  cantidad: number;
-  precio_unitario: number;
-};
-
-type Venta = {
-  receipt_id: string;
-  fecha: string;
-  total: number;
-  max_facturable?: number;
-  items: VentaItem[];
-  items_facturables?: VentaItem[];
-};
-
-type Cliente = {
-  exists?: boolean;
-  id: string | null;
-  name: string;
-  email: string;
-  phone?: string;
-  dni: string | null;
-};
-
-type FacturaModalProps = {
-  open: boolean;
-  onClose: () => void;
-  venta: Venta;
-  cliente: Cliente | null;
-  onEmailChange: (email: string) => void;
-  onFacturar: () => void;
-};
-
-export default function FacturaModal({
-  open,
-  onClose,
-  venta,
-  cliente,
-  onEmailChange,
-  onFacturar,
-}: FacturaModalProps) {
-  const [localCliente, setLocalCliente] = useState<Cliente | null>(null);
+export default function FacturaModal({ open, onClose, venta, cliente, onFacturar }: any) {
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (cliente) setLocalCliente(cliente);
-  }, [cliente]);
+  if (!open) return null;
 
-  if (!open || !localCliente) return null;
-
-  // ✅ COMPATIBLE CON REEMBOLSOS
-  const items =
-    venta.items_facturables ?? venta.items ?? [];
-
-  const total =
-    venta.max_facturable ?? venta.total ?? 0;
-
-  async function handleFacturar() {
+  async function confirmar() {
     setLoading(true);
-    try {
-      await onFacturar();
-    } finally {
-      setLoading(false);
-    }
+    await onFacturar();
+    setLoading(false);
   }
 
+  const items = venta.items_facturables ?? venta.items ?? [];
+  const total = venta.max_facturable ?? venta.total;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-      <div className="bg-white w-full max-w-md rounded-lg shadow-lg p-6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-        >
-          ✖
-        </button>
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-4 shadow-2xl">
 
-        <h2 className="text-xl font-bold mb-4">
-          Facturar Venta #{venta.receipt_id}
-        </h2>
-
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">Cliente:</label>
-          <p>{localCliente.name || "Consumidor Final"}</p>
+        {/* Título */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">📄 Confirmar Factura</h2>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 text-lg"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">DNI:</label>
-          <input
-            value={localCliente.dni || ""}
-            readOnly
-            className="w-full border rounded p-2 bg-gray-100"
-          />
+        {/* ID venta */}
+        <p className="text-xs text-gray-400 font-mono">Venta #{venta.receipt_id}</p>
+
+        {/* Cliente */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3">
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Cliente</p>
+          <p className="text-sm font-medium text-gray-800">
+            {cliente?.name || "Consumidor Final"}
+          </p>
+          {cliente?.dni && (
+            <p className="text-xs text-gray-500">DNI: {cliente.dni}</p>
+          )}
         </div>
 
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">Email:</label>
-          <input
-            type="email"
-            value={localCliente.email || ""}
-            onChange={(e) => {
-              setLocalCliente({ ...localCliente, email: e.target.value });
-              onEmailChange(e.target.value);
-            }}
-            className="w-full border rounded p-2"
-          />
-        </div>
-
-        <div className="mb-3">
-          <label className="block text-sm font-semibold">Productos:</label>
-          <div className="border rounded p-2 max-h-32 overflow-y-auto bg-gray-50">
-            {items.map((it, i) => (
-              <div key={i} className="flex justify-between text-sm border-b py-1">
-                <span>{it.nombre}</span>
-                <span>
-                  {it.cantidad} × ${it.precio_unitario}
+        {/* Items */}
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Detalle</p>
+          <div className="border border-gray-100 rounded-xl overflow-hidden">
+            {items.map((item: any, idx: number) => (
+              <div
+                key={idx}
+                className={`flex justify-between items-center px-4 py-3 text-sm ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+              >
+                <span className="text-gray-700 flex-1 mr-2">{item.nombre}</span>
+                <span className="text-gray-500 text-xs whitespace-nowrap">
+                  {item.cantidad} × ${Number(item.precio_unitario).toFixed(2)}
                 </span>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-lg font-semibold mb-4">
-          Total: <span className="text-green-700">${total}</span>
-        </p>
+        {/* Total */}
+        <div className="bg-blue-50 rounded-xl px-4 py-3 flex justify-between items-center">
+          <span className="font-semibold text-gray-700">Total a facturar</span>
+          <span className="text-xl font-bold text-blue-700">
+            ${Number(total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+          </span>
+        </div>
 
-        <button
-          onClick={handleFacturar}
-          disabled={loading}
-          className={`w-full py-2 rounded text-white ${
-            loading
-              ? "bg-blue-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {loading ? "Cargando…" : "Generar Factura"}
-        </button>
+        {/* Botones */}
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <button
+            onClick={onClose}
+            className="py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-base transition"
+          >
+            Cancelar
+          </button>
+          <button
+            disabled={loading}
+            onClick={confirmar}
+            className="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-base transition disabled:opacity-60 shadow"
+          >
+            {loading ? "⏳ Generando…" : "✅ Confirmar"}
+          </button>
+        </div>
+
       </div>
     </div>
   );

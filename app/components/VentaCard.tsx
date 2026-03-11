@@ -7,17 +7,13 @@ import { fetchCliente, facturarVenta } from "../lib/api";
 const showToast = (msg: string) => {
   const toast = document.createElement("div");
   toast.innerText = msg;
-  toast.style.position = "fixed";
-  toast.style.bottom = "30px";
-  toast.style.right = "30px";
-  toast.style.padding = "12px 18px";
-  toast.style.background = "rgba(0,0,0,0.85)";
-  toast.style.color = "white";
-  toast.style.borderRadius = "8px";
-  toast.style.fontSize = "14px";
-  toast.style.zIndex = "9999";
-  toast.style.opacity = "0";
-  toast.style.transition = "opacity 0.4s";
+  Object.assign(toast.style, {
+    position: "fixed", bottom: "30px", right: "20px",
+    padding: "12px 18px", background: "rgba(0,0,0,0.85)",
+    color: "white", borderRadius: "12px", fontSize: "14px",
+    zIndex: "9999", opacity: "0", transition: "opacity 0.4s",
+    maxWidth: "280px",
+  });
   document.body.appendChild(toast);
   setTimeout(() => (toast.style.opacity = "1"), 50);
   setTimeout(() => {
@@ -28,21 +24,17 @@ const showToast = (msg: string) => {
 
 export default function VentaCard({ venta, onFacturada }: any) {
   const esReembolso = venta.receipt_type === "REFUND";
-
   const [modalOpen, setModalOpen] = useState(false);
   const [cliente, setCliente] = useState<any>(null);
   const [invoice, setInvoice] = useState(venta.invoice ?? null);
   const [yaFacturada, setYaFacturada] = useState(venta.already_invoiced === true);
-
   const [mostrarEmailBox, setMostrarEmailBox] = useState(false);
   const [emailAEnviar, setEmailAEnviar] = useState("");
   const [enviandoEmail, setEnviandoEmail] = useState(false);
 
   const tieneReembolso = venta.refund_status === "PARTIAL" || venta.refund_status === "TOTAL";
+  const pagos = Array.isArray(venta.pagos) ? venta.pagos : [];
 
-  // =========================
-  // Facturación
-  // =========================
   async function abrirModal() {
     if (yaFacturada || esReembolso) return;
     setModalOpen(true);
@@ -50,19 +42,8 @@ export default function VentaCard({ venta, onFacturada }: any) {
       const data = await fetchCliente(venta.cliente_id);
       setCliente(data);
     } else {
-      setCliente({
-        exists: false,
-        id: null,
-        name: "Consumidor Final",
-        email: "",
-        phone: "",
-        dni: null,
-      });
+      setCliente({ id: null, name: "Consumidor Final", email: "", dni: null });
     }
-  }
-
-  function cerrarModal() {
-    setModalOpen(false);
   }
 
   async function generarFactura() {
@@ -70,16 +51,10 @@ export default function VentaCard({ venta, onFacturada }: any) {
     try {
       const resp = await facturarVenta({
         receipt_id: venta.receipt_id,
-        cliente: {
-          id: cliente.id,
-          name: cliente.name,
-          email: cliente.email,
-          dni: cliente.dni,
-        },
+        cliente: { id: cliente.id, name: cliente.name, email: cliente.email, dni: cliente.dni },
         items: venta.items_facturables ?? venta.items,
         total: venta.max_facturable ?? venta.total,
       });
-
       setInvoice(resp.invoice);
       setYaFacturada(true);
       onFacturada(resp.invoice);
@@ -89,9 +64,6 @@ export default function VentaCard({ venta, onFacturada }: any) {
     }
   }
 
-  // =========================
-  // Email
-  // =========================
   async function abrirEnviarMail() {
     const emailInicial = invoice?.email_cliente || cliente?.email || "";
     if (!emailInicial && venta.cliente_id) {
@@ -105,10 +77,7 @@ export default function VentaCard({ venta, onFacturada }: any) {
   }
 
   async function confirmarEnvioEmail() {
-    if (!emailAEnviar.trim()) {
-      alert("Ingresá un email válido.");
-      return;
-    }
+    if (!emailAEnviar.trim()) return alert("Ingresá un email válido.");
     setEnviandoEmail(true);
     try {
       const resp = await fetch(
@@ -116,10 +85,7 @@ export default function VentaCard({ venta, onFacturada }: any) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            receipt_id: venta.receipt_id,
-            email: emailAEnviar,
-          }),
+          body: JSON.stringify({ receipt_id: venta.receipt_id, email: emailAEnviar }),
         }
       );
       if (!resp.ok) throw new Error("Error enviando email");
@@ -132,144 +98,141 @@ export default function VentaCard({ venta, onFacturada }: any) {
     }
   }
 
-  // =========================
-  // Método de pago
-  // =========================
-  const pagos = Array.isArray(venta.pagos) ? venta.pagos : [];
-
   function metodoBadges() {
     if (!pagos.length) return null;
     return pagos.map((pago: any, idx: number) => {
-      let label = pago.nombre || "Otro medio";
-      let color = "bg-gray-200 text-gray-700";
-      let icono = "💳";
-
       const nombre = (pago.nombre || "").toUpperCase();
+      let color = "bg-gray-100 text-gray-700";
+      let icono = "💳";
+      let label = pago.nombre || "Otro";
 
       if (pago.tipo === "CASH") {
-        color = "bg-green-200 text-green-800";
-        icono = "💵";
-        label = "Efectivo";
+        color = "bg-green-100 text-green-800"; icono = "💵"; label = "Efectivo";
       } else if (nombre.includes("QR") || nombre.includes("MERCADO")) {
-        color = "bg-blue-200 text-blue-800";
-        icono = "📱";
-        label = pago.nombre;
+        color = "bg-blue-100 text-blue-800"; icono = "📱";
       } else if (nombre.includes("TRANSFER")) {
-        color = "bg-purple-200 text-purple-800";
-        icono = "🏦";
-        label = "Transferencia";
+        color = "bg-purple-100 text-purple-800"; icono = "🏦"; label = "Transferencia";
       } else if (nombre.includes("TARJETA") || nombre.includes("CARD") || nombre.includes("CREDITO") || nombre.includes("DEBITO")) {
-        color = "bg-orange-200 text-orange-800";
-        icono = "💳";
-        label = pago.nombre;
+        color = "bg-orange-100 text-orange-800"; icono = "💳";
       } else if (nombre.includes("GIFT") || nombre.includes("REGALO")) {
-        color = "bg-cyan-200 text-cyan-800";
-        icono = "🎁";
-        label = "Gift Card";
+        color = "bg-cyan-100 text-cyan-800"; icono = "🎁"; label = "Gift Card";
       }
 
       return (
-        <span key={idx} className={`inline-block px-2 py-1 text-xs rounded-full mr-1 ${color}`}>
-          {icono} {label} ${pago.monto?.toFixed(2) ?? ""}
+        <span key={idx} className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${color}`}>
+          {icono} {label} · ${Number(pago.monto ?? 0).toFixed(2)}
         </span>
       );
     });
   }
 
-  // =========================
-  // Render
-  // =========================
   return (
-    <div className="border p-4 rounded shadow bg-white relative mb-3">
-      <h3 className="font-bold text-lg">
-        {esReembolso ? "🔴 Reembolso" : "🛒 Venta"} #{venta.receipt_id}
-      </h3>
+    <div className={`bg-white rounded-2xl shadow border p-4 ${esReembolso ? "border-red-200 bg-red-50" : yaFacturada ? "border-green-200" : "border-gray-100"}`}>
 
-      <p className="text-sm text-gray-600">{venta.fecha}</p>
-
-      <div className="mt-1 flex flex-wrap gap-1">{metodoBadges()}</div>
-
-      {esReembolso && (
-        <span className="inline-block mt-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
-          REEMBOLSO
-        </span>
-      )}
-
-      {yaFacturada && invoice && (
-        <span className="inline-block mt-2 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded ml-1">
-          ✓ Facturada #{invoice.cbte_nro}
-        </span>
-      )}
-
-      {tieneReembolso && !esReembolso && (
-        <div className="mt-2 text-sm text-red-700">
-          Reembolsado: ${venta.refunded_amount} · Máx facturable: ${venta.max_facturable}
+      {/* CABECERA */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs text-gray-400 font-mono">#{venta.receipt_id}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{venta.fecha}</p>
         </div>
-      )}
+        <div className="flex flex-col items-end gap-1">
+          {esReembolso && (
+            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">🔴 REEMBOLSO</span>
+          )}
+          {yaFacturada && (
+            <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">✓ Factura #{invoice?.cbte_nro}</span>
+          )}
+          {!yaFacturada && !esReembolso && (
+            <span className="bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-1 rounded-full">⏳ Pendiente</span>
+          )}
+        </div>
+      </div>
 
-      <p className="font-semibold mt-2">
-        Monto: ${venta.max_facturable ?? venta.total}
+      {/* MONTO */}
+      <p className="text-2xl font-bold text-gray-900 mt-3">
+        ${Number(venta.max_facturable ?? venta.total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
       </p>
 
-      {/* Botones — siempre se muestran todos, cambia el estado */}
-      <div className="flex flex-wrap gap-2 mt-3">
+      {/* CLIENTE */}
+      {venta.cliente_nombre && venta.cliente_nombre !== "Consumidor Final" && (
+        <p className="text-sm text-gray-600 mt-1">👤 {venta.cliente_nombre}</p>
+      )}
 
-        {/* Botón Facturar — siempre visible, desactivado si ya está facturada o es reembolso */}
+      {/* REEMBOLSO INFO */}
+      {tieneReembolso && !esReembolso && (
+        <p className="text-xs text-red-600 mt-1">
+          ⚠️ Reembolsado: ${venta.refunded_amount} · Máx facturable: ${venta.max_facturable}
+        </p>
+      )}
+
+      {/* MÉTODOS DE PAGO */}
+      <div className="flex flex-wrap gap-1 mt-3">
+        {metodoBadges()}
+      </div>
+
+      {/* BOTONES */}
+      <div className="grid grid-cols-3 gap-2 mt-4">
         <button
           disabled={yaFacturada || esReembolso}
           onClick={abrirModal}
-          className={`px-3 py-2 rounded text-white text-sm ${
-            yaFacturada || esReembolso
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
+          className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
+            yaFacturada
+              ? "bg-green-100 text-green-700 cursor-not-allowed"
+              : esReembolso
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
           }`}
         >
-          {yaFacturada ? "✓ Facturada" : "Facturar"}
+          {yaFacturada ? "✓ Emitida" : "📄 Facturar"}
         </button>
 
-        {/* Ver PDF — solo si hay invoice con URL */}
-        {invoice?.drive_url && (
-          <button
-            onClick={() => window.open(invoice.drive_url, "_blank")}
-            className="px-3 py-2 bg-gray-800 text-white rounded text-sm"
-          >
-            📄 Ver PDF
-          </button>
-        )}
+        <button
+          disabled={!invoice?.drive_url}
+          onClick={() => invoice?.drive_url && window.open(invoice.drive_url, "_blank")}
+          className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
+            invoice?.drive_url
+              ? "bg-gray-800 hover:bg-gray-900 text-white shadow-sm"
+              : "bg-gray-100 text-gray-300 cursor-not-allowed"
+          }`}
+        >
+          🔍 Ver PDF
+        </button>
 
-        {/* Enviar por mail — solo si está facturada */}
-        {yaFacturada && (
-          <button
-            onClick={abrirEnviarMail}
-            className="px-3 py-2 bg-green-600 text-white rounded text-sm"
-          >
-            📧 Enviar por mail
-          </button>
-        )}
+        <button
+          disabled={!yaFacturada}
+          onClick={yaFacturada ? abrirEnviarMail : undefined}
+          className={`py-3 rounded-xl text-sm font-semibold transition active:scale-95 ${
+            yaFacturada
+              ? "bg-green-600 hover:bg-green-700 text-white shadow-sm"
+              : "bg-gray-100 text-gray-300 cursor-not-allowed"
+          }`}
+        >
+          📧 Mail
+        </button>
       </div>
 
-      {/* Campo email */}
+      {/* EMAIL BOX */}
       {mostrarEmailBox && (
-        <div className="mt-3 p-3 border rounded bg-gray-50">
-          <p className="text-sm font-medium mb-1">Email del cliente:</p>
+        <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <p className="text-sm font-semibold text-gray-700 mb-2">📧 Enviar factura por mail</p>
           <input
             type="email"
             value={emailAEnviar}
             onChange={(e) => setEmailAEnviar(e.target.value)}
             placeholder="email@ejemplo.com"
-            className="w-full border rounded p-2 mb-2 text-sm"
+            className="w-full px-3 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-green-500 mb-3"
           />
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={confirmarEnvioEmail}
               disabled={enviandoEmail}
-              className="flex-1 py-2 bg-green-700 text-white rounded text-sm"
+              className="py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm disabled:opacity-60"
             >
-              {enviandoEmail ? "Enviando…" : "Confirmar envío"}
+              {enviandoEmail ? "Enviando…" : "✅ Confirmar"}
             </button>
             <button
               onClick={() => setMostrarEmailBox(false)}
-              className="px-3 py-2 bg-gray-300 text-gray-700 rounded text-sm"
+              className="py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold text-sm"
             >
               Cancelar
             </button>
@@ -279,7 +242,7 @@ export default function VentaCard({ venta, onFacturada }: any) {
 
       <FacturaModal
         open={modalOpen}
-        onClose={cerrarModal}
+        onClose={() => setModalOpen(false)}
         venta={venta}
         cliente={cliente}
         onFacturar={generarFactura}
