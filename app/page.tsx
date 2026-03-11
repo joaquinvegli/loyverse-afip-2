@@ -25,7 +25,7 @@ export default function HomePage() {
   function formatearFecha(fechaISO: string) {
     try {
       const fecha = new Date(fechaISO);
-      const fechaArg = new Date(fecha.getTime() + 3 * 60 * 60 * 1000);
+      const fechaArg = new Date(fecha.getTime() - 3 * 60 * 60 * 1000);
       const dia = fechaArg.getUTCDate().toString().padStart(2, "0");
       const mes = (fechaArg.getUTCMonth() + 1).toString().padStart(2, "0");
       const año = fechaArg.getUTCFullYear();
