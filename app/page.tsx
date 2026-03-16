@@ -61,7 +61,6 @@ export default function HomePage() {
     async function despertarYCargar() {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       setConectando(true);
-
       for (let i = 0; i < 10; i++) {
         try {
           const resp = await fetch(`${backendUrl}/health`, {
@@ -73,15 +72,13 @@ export default function HomePage() {
             return;
           }
         } catch {
-          // Sigue durmiendo, esperar y reintentar
+          // sigue durmiendo
         }
         await new Promise(res => setTimeout(res, 3000));
       }
-
       setConectando(false);
       setError("No se pudo conectar con el servidor. Intentá recargar la página.");
     }
-
     despertarYCargar();
   }, []);
 
@@ -95,17 +92,47 @@ export default function HomePage() {
     return !soloEfectivo;
   }).length;
 
+  // Ventas pendientes no efectivo, ordenadas de mayor a menor monto
+  function getVentasPendientesNoEfectivo() {
+    return ventasSolo
+      .filter(v => {
+        if (v.already_invoiced) return false;
+        const pagos = Array.isArray(v.pagos) ? v.pagos : [];
+        const soloEfectivo = pagos.length > 0 && pagos.every((p: any) => p.tipo === "CASH");
+        return !soloEfectivo;
+      })
+      .sort((a, b) => (b.max_facturable ?? b.total) - (a.max_facturable ?? a.total));
+  }
+
+  function seleccionarPorPorcentaje(pct: number) {
+    const elegibles = getVentasPendientesNoEfectivo();
+    if (elegibles.length === 0) return;
+
+    const montoTotal = elegibles.reduce((acc, v) => acc + (v.max_facturable ?? v.total), 0);
+    const objetivo = montoTotal * (pct / 100);
+
+    let acumulado = 0;
+    const ids: string[] = [];
+
+    for (const v of elegibles) {
+      const monto = v.max_facturable ?? v.total;
+      if (acumulado >= objetivo) break;
+      ids.push(v.receipt_id);
+      acumulado += monto;
+    }
+
+    setSeleccionadas(ids);
+  }
+
+  function seleccionarTodosPendientes() {
+    const ids = getVentasPendientesNoEfectivo().map(v => v.receipt_id);
+    setSeleccionadas(ids);
+  }
+
   function toggleSeleccion(receipt_id: string) {
     setSeleccionadas(prev =>
       prev.includes(receipt_id) ? prev.filter(id => id !== receipt_id) : [...prev, receipt_id]
     );
-  }
-
-  function seleccionarTodosPendientes() {
-    const ids = ventasSolo
-      .filter(v => !v.already_invoiced && v.receipt_type !== "REFUND")
-      .map(v => v.receipt_id);
-    setSeleccionadas(ids);
   }
 
   async function facturarMasivo() {
@@ -172,6 +199,19 @@ export default function HomePage() {
     setModoSeleccion(false);
     await cargarVentas();
   }
+
+  // Monto total seleccionado
+  const montoSeleccionado = seleccionadas.reduce((acc, id) => {
+    const v = ventas.find(v => v.receipt_id === id);
+    return acc + (v ? (v.max_facturable ?? v.total) : 0);
+  }, 0);
+
+  const montoTotalNoEfectivo = getVentasPendientesNoEfectivo()
+    .reduce((acc, v) => acc + (v.max_facturable ?? v.total), 0);
+
+  const pctSeleccionado = montoTotalNoEfectivo > 0
+    ? Math.round((montoSeleccionado / montoTotalNoEfectivo) * 100)
+    : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -290,21 +330,44 @@ export default function HomePage() {
 
             {modoSeleccion && (
               <div className="space-y-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={seleccionarTodosPendientes}
-                    className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold"
-                  >
-                    Seleccionar todos los pendientes
-                  </button>
-                  <button
-                    onClick={() => setSeleccionadas([])}
-                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-xl text-xs"
-                  >
-                    Limpiar
-                  </button>
+
+                {/* BOTONES DE PORCENTAJE */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-2">Seleccionar por monto (solo ventas no en efectivo):</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[25, 50, 75, 100].map(pct => (
+                      <button
+                        key={pct}
+                        onClick={() => seleccionarPorPorcentaje(pct)}
+                        className="py-2.5 rounded-xl text-sm font-bold border-2 transition active:scale-95 border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
+                {/* RESUMEN SELECCIÓN */}
+                {seleccionadas.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-blue-800">
+                        {seleccionadas.length} venta{seleccionadas.length > 1 ? "s" : ""} seleccionada{seleccionadas.length > 1 ? "s" : ""}
+                      </p>
+                      <p className="text-xs text-blue-600 mt-0.5">
+                        ${montoSeleccionado.toLocaleString("es-AR", { minimumFractionDigits: 2 })} · {pctSeleccionado}% del total no efectivo
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSeleccionadas([])}
+                      className="text-xs text-blue-400 hover:text-blue-600 font-semibold"
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                )}
+
+                {/* BOTÓN FACTURAR */}
                 {seleccionadas.length > 0 && (
                   <button
                     onClick={facturarMasivo}
@@ -313,11 +376,12 @@ export default function HomePage() {
                   >
                     {facturandoMasivo
                       ? `⏳ Facturando... (${progresoMasivo.filter(p => p.startsWith("✅")).length}/${seleccionadas.length})`
-                      : `✅ Facturar ${seleccionadas.length} venta${seleccionadas.length > 1 ? "s" : ""}`
+                      : `✅ Facturar ${seleccionadas.length} venta${seleccionadas.length > 1 ? "s" : ""} · $${montoSeleccionado.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`
                     }
                   </button>
                 )}
 
+                {/* PROGRESO */}
                 {progresoMasivo.length > 0 && (
                   <div className="bg-gray-50 rounded-xl p-3 space-y-1 max-h-40 overflow-y-auto">
                     {progresoMasivo.map((msg, i) => (
@@ -325,6 +389,7 @@ export default function HomePage() {
                     ))}
                   </div>
                 )}
+
               </div>
             )}
           </div>
