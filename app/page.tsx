@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import VentaCard from "./components/VentaCard";
 import { fetchVentas, facturarVenta } from "./lib/api";
 import LoginScreen from "./components/LoginScreen";
 
 export default function HomePage() {
+  const router = useRouter();
   const hoy = new Date();
   const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
 
@@ -24,7 +26,6 @@ export default function HomePage() {
   const [progresoMasivo, setProgresoMasivo] = useState<string[]>([]);
   const progresoRef = useRef<string[]>([]);
 
-  // Verificar sesión al cargar
   useEffect(() => {
     const expiry = localStorage.getItem("session_expiry");
     if (expiry && Date.now() < Number(expiry)) {
@@ -139,11 +140,6 @@ export default function HomePage() {
     setSeleccionadas(ids);
   }
 
-  function seleccionarTodosPendientes() {
-    const ids = getVentasPendientesNoEfectivo().map(v => v.receipt_id);
-    setSeleccionadas(ids);
-  }
-
   function toggleSeleccion(receipt_id: string) {
     setSeleccionadas(prev =>
       prev.includes(receipt_id) ? prev.filter(id => id !== receipt_id) : [...prev, receipt_id]
@@ -246,12 +242,20 @@ export default function HomePage() {
               <p className="text-blue-200 text-xs mt-0.5">Sistema de facturación AFIP</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-blue-300 hover:text-white text-xs font-semibold transition"
-          >
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/facturas")}
+              className="text-blue-200 hover:text-white text-xs font-semibold transition"
+            >
+              🧾 Facturas emitidas
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-blue-300 hover:text-white text-xs font-semibold transition"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </div>
 

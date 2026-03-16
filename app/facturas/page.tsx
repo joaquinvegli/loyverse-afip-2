@@ -32,10 +32,27 @@ interface Factura {
   nota_credito: NotaCredito | null;
 }
 
+function dmy2ymd(dmy: string): string {
+  const parts = dmy.split("/");
+  if (parts.length !== 3) return "";
+  const [d, m, y] = parts;
+  return `${y}-${m}-${d}`;
+}
+
+function ymd2dmy(ymd: string): string {
+  const parts = ymd.split("-");
+  if (parts.length !== 3) return "";
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
+function formatNroCbte(pto_vta: number, cbte_nro: number): string {
+  return `${String(pto_vta).padStart(4, "0")}-${String(cbte_nro).padStart(8, "0")}`;
+}
+
 export default function FacturasPage() {
   const router = useRouter();
 
-  // Auth
   useEffect(() => {
     const expiry = localStorage.getItem("session_expiry");
     if (!expiry || Date.now() >= Number(expiry)) {
@@ -118,21 +135,7 @@ export default function FacturasPage() {
     }
   }
 
-  function formatNroCbte(pto_vta: number, cbte_nro: number) {
-    return `${String(pto_vta).padStart(4, "0")}-${String(cbte_nro).padStart(8, "0")}`;
-  }
-
   const totalMonto = facturas.reduce((acc, f) => acc + f.total, 0);
-
-  // Convertir fecha DD/MM/YYYY a input[type=date] YYYY-MM-DD
-  function dmy2ymd(dmy: string) {
-    const [d, m, y] = dmy.split("/");
-    return `${y}-${m}-${d}`;
-  }
-  function ymd2dmy(ymd: string) {
-    const [y, m, d] = ymd.split("-");
-    return `${d}/${m}/${y}`;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -334,7 +337,6 @@ export default function FacturasPage() {
 
                   {/* Acciones */}
                   <div className="flex flex-col gap-2">
-                    {/* Ver / descargar PDF */}
                     {f.drive_url && (
                       
                         href={f.drive_url}
@@ -346,7 +348,6 @@ export default function FacturasPage() {
                       </a>
                     )}
 
-                    {/* Reenviar email */}
                     <div className="space-y-2">
                       <p className="text-xs text-gray-500 font-medium">Reenviar por email:</p>
                       <div className="flex gap-2">
@@ -381,6 +382,7 @@ export default function FacturasPage() {
             </div>
           ))}
         </div>
+
       </div>
     </div>
   );
