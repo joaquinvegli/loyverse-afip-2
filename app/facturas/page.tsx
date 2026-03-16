@@ -1,3 +1,4 @@
+// v2
 "use client";
 
 import { useEffect, useState } from "react";
@@ -338,7 +339,7 @@ export default function FacturasPage() {
                   {/* Acciones */}
                   <div className="flex flex-col gap-2">
                     {f.drive_url && (
-                      
+                      <a
                         href={f.drive_url}
                         target="_blank"
                         rel="noopener noreferrer"
