@@ -243,6 +243,12 @@ export default function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+          <button
+  onClick={() => router.push("/admin")}
+  className="text-blue-200 hover:text-white text-xs font-semibold transition"
+>
+  ⚙️ Administración
+</button>
             <button
               onClick={() => router.push("/facturas")}
               className="text-blue-200 hover:text-white text-xs font-semibold transition"
