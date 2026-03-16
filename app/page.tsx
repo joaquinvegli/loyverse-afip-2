@@ -3,11 +3,13 @@
 import { useEffect, useState, useRef } from "react";
 import VentaCard from "./components/VentaCard";
 import { fetchVentas, facturarVenta } from "./lib/api";
+import LoginScreen from "./components/LoginScreen";
 
 export default function HomePage() {
   const hoy = new Date();
   const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
 
+  const [autenticado, setAutenticado] = useState(false);
   const [desde, setDesde] = useState(hoyStr);
   const [hasta, setHasta] = useState(hoyStr);
   const [ventas, setVentas] = useState<any[]>([]);
@@ -21,6 +23,23 @@ export default function HomePage() {
   const [facturandoMasivo, setFacturandoMasivo] = useState(false);
   const [progresoMasivo, setProgresoMasivo] = useState<string[]>([]);
   const progresoRef = useRef<string[]>([]);
+
+  // Verificar sesión al cargar
+  useEffect(() => {
+    const expiry = localStorage.getItem("session_expiry");
+    if (expiry && Date.now() < Number(expiry)) {
+      setAutenticado(true);
+    }
+  }, []);
+
+  function handleLogin() {
+    setAutenticado(true);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("session_expiry");
+    setAutenticado(false);
+  }
 
   function formatearFecha(fechaISO: string) {
     try {
@@ -58,6 +77,7 @@ export default function HomePage() {
   }
 
   useEffect(() => {
+    if (!autenticado) return;
     async function despertarYCargar() {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       setConectando(true);
@@ -80,7 +100,7 @@ export default function HomePage() {
       setError("No se pudo conectar con el servidor. Intentá recargar la página.");
     }
     despertarYCargar();
-  }, []);
+  }, [autenticado]);
 
   const ventasSolo = ventas.filter(v => v.receipt_type !== "REFUND");
   const totalVentas = ventasSolo.length;
@@ -92,7 +112,6 @@ export default function HomePage() {
     return !soloEfectivo;
   }).length;
 
-  // Ventas pendientes no efectivo, ordenadas de mayor a menor monto
   function getVentasPendientesNoEfectivo() {
     return ventasSolo
       .filter(v => {
@@ -107,20 +126,16 @@ export default function HomePage() {
   function seleccionarPorPorcentaje(pct: number) {
     const elegibles = getVentasPendientesNoEfectivo();
     if (elegibles.length === 0) return;
-
     const montoTotal = elegibles.reduce((acc, v) => acc + (v.max_facturable ?? v.total), 0);
     const objetivo = montoTotal * (pct / 100);
-
     let acumulado = 0;
     const ids: string[] = [];
-
     for (const v of elegibles) {
       const monto = v.max_facturable ?? v.total;
       if (acumulado >= objetivo) break;
       ids.push(v.receipt_id);
       acumulado += monto;
     }
-
     setSeleccionadas(ids);
   }
 
@@ -147,7 +162,6 @@ export default function HomePage() {
     for (const receipt_id of ids) {
       const venta = ventas.find(v => v.receipt_id === receipt_id);
       if (!venta) continue;
-
       try {
         const nuevoProg = [...progresoRef.current, `⏳ Facturando ${receipt_id}...`];
         progresoRef.current = nuevoProg;
@@ -170,7 +184,6 @@ export default function HomePage() {
         });
 
         facturadas_ok.push(receipt_id);
-
         const progActualizado = progresoRef.current.map(p =>
           p.includes(receipt_id) ? `✅ ${receipt_id} facturada` : p
         );
@@ -200,7 +213,6 @@ export default function HomePage() {
     await cargarVentas();
   }
 
-  // Monto total seleccionado
   const montoSeleccionado = seleccionadas.reduce((acc, id) => {
     const v = ventas.find(v => v.receipt_id === id);
     return acc + (v ? (v.max_facturable ?? v.total) : 0);
@@ -213,21 +225,33 @@ export default function HomePage() {
     ? Math.round((montoSeleccionado / montoTotalNoEfectivo) * 100)
     : 0;
 
+  if (!autenticado) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
 
       {/* HEADER */}
       <div className="bg-blue-900 text-white px-6 py-4 shadow-lg">
-        <div className="max-w-3xl mx-auto flex items-center gap-4">
-          <img
-            src="https://raw.githubusercontent.com/joaquinvegli/loyverse-afip/refs/heads/main/static/logo_fixed.png"
-            alt="Top Fundas"
-            className="w-12 h-12 rounded-xl object-contain bg-white p-1"
-          />
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Top Fundas</h1>
-            <p className="text-blue-200 text-xs mt-0.5">Sistema de facturación AFIP</p>
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img
+              src="https://raw.githubusercontent.com/joaquinvegli/loyverse-afip/refs/heads/main/static/logo_fixed.png"
+              alt="Top Fundas"
+              className="w-12 h-12 rounded-xl object-contain bg-white p-1"
+            />
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Top Fundas</h1>
+              <p className="text-blue-200 text-xs mt-0.5">Sistema de facturación AFIP</p>
+            </div>
           </div>
+          <button
+            onClick={handleLogout}
+            className="text-blue-300 hover:text-white text-xs font-semibold transition"
+          >
+            Cerrar sesión
+          </button>
         </div>
       </div>
 
@@ -330,8 +354,6 @@ export default function HomePage() {
 
             {modoSeleccion && (
               <div className="space-y-3">
-
-                {/* BOTONES DE PORCENTAJE */}
                 <div>
                   <p className="text-xs text-gray-500 mb-2">Seleccionar por monto (solo ventas no en efectivo):</p>
                   <div className="grid grid-cols-4 gap-2">
@@ -347,7 +369,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* RESUMEN SELECCIÓN */}
                 {seleccionadas.length > 0 && (
                   <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center justify-between">
                     <div>
@@ -367,7 +388,6 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* BOTÓN FACTURAR */}
                 {seleccionadas.length > 0 && (
                   <button
                     onClick={facturarMasivo}
@@ -381,7 +401,6 @@ export default function HomePage() {
                   </button>
                 )}
 
-                {/* PROGRESO */}
                 {progresoMasivo.length > 0 && (
                   <div className="bg-gray-50 rounded-xl p-3 space-y-1 max-h-40 overflow-y-auto">
                     {progresoMasivo.map((msg, i) => (
@@ -389,7 +408,6 @@ export default function HomePage() {
                     ))}
                   </div>
                 )}
-
               </div>
             )}
           </div>
