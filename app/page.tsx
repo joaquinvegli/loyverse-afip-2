@@ -260,7 +260,7 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
-      <a
+
         {/* BANNER CONECTANDO */}
         {conectando && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 flex items-center gap-3">
