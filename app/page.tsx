@@ -79,27 +79,36 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!autenticado) return;
+
     async function despertarYCargar() {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       setConectando(true);
-      for (let i = 0; i < 10; i++) {
+
+      for (let i = 0; i < 12; i++) {
         try {
           const resp = await fetch(`${backendUrl}/health`, {
-            signal: AbortSignal.timeout(5000),
+            // FIX 1: timeout aumentado a 8s (Render puede tardar bastante en arrancar)
+            signal: AbortSignal.timeout(8000),
           });
           if (resp.ok) {
+            // FIX 2: delay de 1.2s antes de cargar ventas para que el servidor
+            // termine de inicializar todos sus módulos tras responder /health
+            await new Promise(res => setTimeout(res, 1200));
             setConectando(false);
             await cargarVentas();
             return;
           }
         } catch {
-          // sigue durmiendo
+          // servidor todavía durmiendo, seguimos reintentando
         }
         await new Promise(res => setTimeout(res, 3000));
       }
+
+      // FIX 3: si agotamos los reintentos, error con opción de reintento manual
       setConectando(false);
-      setError("No se pudo conectar con el servidor. Intentá recargar la página.");
+      setError("No se pudo conectar con el servidor. Tocá 'Ver ventas' para reintentar.");
     }
+
     despertarYCargar();
   }, [autenticado]);
 
@@ -243,25 +252,32 @@ export default function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-  <button
-    onClick={() => router.push("/facturas")}
-    className="text-blue-200 hover:text-white text-xs font-semibold transition"
-  >
-    🧾 Facturas emitidas
-  </button>
-  <button
-    onClick={() => router.push("/admin")}
-    className="text-blue-200 hover:text-white text-xs font-semibold transition"
-  >
-    ⚙️ Administración
-  </button>
-  <button
-    onClick={handleLogout}
-    className="text-blue-300 hover:text-white text-xs font-semibold transition"
-  >
-    Cerrar sesión
-  </button>
-</div>
+            <button
+              onClick={() => router.push("/facturas")}
+              className="text-blue-200 hover:text-white text-xs font-semibold transition"
+            >
+              🧾 Facturas emitidas
+            </button>
+            {/* NUEVO: botón arqueo de caja */}
+            <button
+              onClick={() => router.push("/arqueo")}
+              className="text-blue-200 hover:text-white text-xs font-semibold transition"
+            >
+              💰 Arqueo de caja
+            </button>
+            <button
+              onClick={() => router.push("/admin")}
+              className="text-blue-200 hover:text-white text-xs font-semibold transition"
+            >
+              ⚙️ Administración
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-blue-300 hover:text-white text-xs font-semibold transition"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </div>
 
@@ -307,8 +323,18 @@ export default function HomePage() {
           >
             {cargando ? "⏳ Cargando..." : "🔍 Ver ventas"}
           </button>
+          {/* FIX 3: error con botón de reintento manual */}
           {error && (
-            <p className="mt-3 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2">❌ {error}</p>
+            <div className="mt-3 bg-red-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+              <p className="text-red-600 text-sm">❌ {error}</p>
+              <button
+                onClick={cargarVentas}
+                disabled={cargando}
+                className="shrink-0 text-xs font-semibold text-red-700 underline hover:text-red-900 disabled:opacity-50"
+              >
+                Reintentar
+              </button>
+            </div>
           )}
         </div>
 
