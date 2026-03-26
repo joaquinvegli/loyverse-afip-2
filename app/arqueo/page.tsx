@@ -558,14 +558,6 @@ function FilaResumen({ label, valor, bold, color }: { label: string; valor: numb
   );
 }
 
-function fechaArg(iso: string) {
-  try {
-    const d = new Date(iso);
-    const a = new Date(d.getTime() - 3 * 60 * 60 * 1000);
-    return `${a.getUTCDate().toString().padStart(2, "0")}/${(a.getUTCMonth() + 1).toString().padStart(2, "0")} ${a.getUTCHours().toString().padStart(2, "0")}:${a.getUTCMinutes().toString().padStart(2, "0")}`;
-  } catch { return iso; }
-}
-
 function ArqueoCard({ arqueo }: { arqueo: any }) {
   const [expandido, setExpandido] = useState(false);
   const dif = arqueo.diferencia ?? 0;
