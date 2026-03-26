@@ -20,11 +20,23 @@ type Retiro = {
   fecha: string;
 };
 
+type Movimiento = {
+  mov_id: string;
+  tipo: "egreso" | "ingreso";
+  monto: number;
+  detalle: string;
+  empleado: string;
+  turno_id: string;
+  fecha: string;
+};
+
 type ResumenCierre = {
   efectivo_inicial: number;
   ingresos_efectivo: number;
   egresos_reembolsos: number;
   egresos_retiros: number;
+  ingresos_manuales: number;
+  egresos_manuales: number;
   esperado: number;
   contado: number;
   diferencia: number;
@@ -52,7 +64,7 @@ type CierreResult = {
 
 // ── helpers
 function fmt(n: number) {
-  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+  return `$${Math.abs(n).toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
 }
 
 function fechaArg(iso: string) {
@@ -73,39 +85,39 @@ function metodosLabel(metodos: string[]) {
 export default function ArqueoPage() {
   const router = useRouter();
 
-  // auth
   const [autenticado, setAutenticado] = useState(false);
   const [pass, setPass] = useState("");
   const [errPass, setErrPass] = useState(false);
 
-  // estado general
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // turno
   const [turnoAbierto, setTurnoAbierto] = useState<Turno | null>(null);
   const [efectivoSugerido, setEfectivoSugerido] = useState<number | null>(null);
 
-  // apertura
   const [nombreEmpleado, setNombreEmpleado] = useState("");
   const [efectivoInicial, setEfectivoInicial] = useState("");
   const [abriendo, setAbriendo] = useState(false);
 
-  // cierre
   const [efectivoContado, setEfectivoContado] = useState("");
   const [notaCierre, setNotaCierre] = useState("");
   const [cerrando, setCerrando] = useState(false);
   const [cierreResult, setCierreResult] = useState<CierreResult | null>(null);
 
-  // retiros del turno
   const [retiros, setRetiros] = useState<Retiro[]>([]);
 
-  // tab
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [mostrarFormMovimiento, setMostrarFormMovimiento] = useState(false);
+  const [tipoMov, setTipoMov] = useState<"egreso" | "ingreso">("egreso");
+  const [montoMov, setMontoMov] = useState("");
+  const [detalleMov, setDetalleMov] = useState("");
+  const [guardandoMov, setGuardandoMov] = useState(false);
+  const [errorMov, setErrorMov] = useState<string | null>(null);
+
   const [tab, setTab] = useState<"arqueo" | "historial">("arqueo");
   const [historial, setHistorial] = useState<any[]>([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
-  // ── auth
   useEffect(() => {
     const expiry = localStorage.getItem("session_expiry");
     if (expiry && Date.now() < Number(expiry)) setAutenticado(true);
@@ -122,11 +134,10 @@ export default function ArqueoPage() {
     }
   }
 
-  // ── cargar estado inicial
   useEffect(() => {
     if (!autenticado) return;
     cargarEstado();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autenticado]);
 
   async function cargarEstado() {
@@ -137,9 +148,9 @@ export default function ArqueoPage() {
       const data = await r.json();
       setTurnoAbierto(data.turno_abierto ?? null);
       setEfectivoSugerido(data.efectivo_inicial_sugerido ?? null);
-
       if (data.turno_abierto) {
         await cargarRetiros(data.turno_abierto.fecha_apertura);
+        await cargarMovimientos();
       }
     } catch (e: any) {
       setError("Error conectando con el servidor: " + e.message);
@@ -152,19 +163,22 @@ export default function ArqueoPage() {
     try {
       const r = await fetch(`${BACKEND}/api/retiros`);
       const data = await r.json();
-      const filtrados = (data.retiros || []).filter(
-        (r: Retiro) => r.fecha >= desdeIso
-      );
-      setRetiros(filtrados);
+      setRetiros((data.retiros || []).filter((ret: Retiro) => ret.fecha >= desdeIso));
     } catch { /* silencioso */ }
   }
 
-  // ── abrir turno
+  async function cargarMovimientos() {
+    try {
+      const r = await fetch(`${BACKEND}/api/arqueo/movimientos`);
+      const data = await r.json();
+      setMovimientos(data.movimientos || []);
+    } catch { /* silencioso */ }
+  }
+
   async function abrirTurno() {
     if (!nombreEmpleado.trim()) { setError("Ingresá tu nombre."); return; }
     const monto = parseFloat(efectivoInicial.replace(",", "."));
     if (isNaN(monto) || monto < 0) { setError("Ingresá un efectivo inicial válido."); return; }
-
     setAbriendo(true);
     setError(null);
     try {
@@ -177,6 +191,7 @@ export default function ArqueoPage() {
       if (!r.ok) throw new Error(data.detail || "Error abriendo turno");
       setTurnoAbierto(data.turno);
       setRetiros([]);
+      setMovimientos([]);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -184,21 +199,41 @@ export default function ArqueoPage() {
     }
   }
 
-  // ── cerrar turno
+  async function registrarMovimiento() {
+    const monto = parseFloat(montoMov.replace(",", "."));
+    if (isNaN(monto) || monto <= 0) { setErrorMov("Ingresá un monto válido."); return; }
+    if (!detalleMov.trim()) { setErrorMov("Ingresá el detalle."); return; }
+    setGuardandoMov(true);
+    setErrorMov(null);
+    try {
+      const r = await fetch(`${BACKEND}/api/arqueo/movimiento`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: tipoMov, monto, detalle: detalleMov.trim() }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Error registrando movimiento");
+      setMovimientos(prev => [...prev, data.movimiento]);
+      setMontoMov("");
+      setDetalleMov("");
+      setMostrarFormMovimiento(false);
+    } catch (e: any) {
+      setErrorMov(e.message);
+    } finally {
+      setGuardandoMov(false);
+    }
+  }
+
   async function cerrarTurno() {
     const monto = parseFloat(efectivoContado.replace(",", "."));
     if (isNaN(monto) || monto < 0) { setError("Ingresá el efectivo contado."); return; }
-
     setCerrando(true);
     setError(null);
     try {
       const r = await fetch(`${BACKEND}/api/arqueo/cerrar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          efectivo_contado: monto,
-          nota: notaCierre,
-        }),
+        body: JSON.stringify({ efectivo_contado: monto, nota: notaCierre }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || "Error cerrando turno");
@@ -211,7 +246,6 @@ export default function ArqueoPage() {
     }
   }
 
-  // ── historial
   async function cargarHistorial() {
     setCargandoHistorial(true);
     try {
@@ -224,9 +258,13 @@ export default function ArqueoPage() {
 
   useEffect(() => {
     if (tab === "historial" && autenticado) cargarHistorial();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, autenticado]);
 
-  // ── Login screen
+  const totalIngresosMov = movimientos.filter(m => m.tipo === "ingreso").reduce((a, m) => a + m.monto, 0);
+  const totalEgresosMov = movimientos.filter(m => m.tipo === "egreso").reduce((a, m) => a + m.monto, 0);
+  const totalRetiros = retiros.reduce((a, r) => a + r.monto, 0);
+
   if (!autenticado) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -245,10 +283,7 @@ export default function ArqueoPage() {
             className={`w-full px-4 py-3 border rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${errPass ? "border-red-400" : "border-gray-300"}`}
           />
           {errPass && <p className="text-red-500 text-sm mt-2">Contraseña incorrecta</p>}
-          <button
-            onClick={handleLogin}
-            className="mt-4 w-full py-3 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-xl"
-          >
+          <button onClick={handleLogin} className="mt-4 w-full py-3 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-xl">
             Ingresar
           </button>
           <button onClick={() => router.push("/")} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600">
@@ -259,12 +294,9 @@ export default function ArqueoPage() {
     );
   }
 
-  const totalRetiros = retiros.reduce((a, r) => a + r.monto, 0);
-
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* HEADER */}
       <div className="bg-blue-900 text-white px-6 py-4 shadow-lg">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -280,7 +312,6 @@ export default function ArqueoPage() {
         </div>
       </div>
 
-      {/* TABS */}
       <div className="max-w-2xl mx-auto px-4 pt-5">
         <div className="flex gap-2 mb-5">
           {(["arqueo", "historial"] as const).map(t => (
@@ -298,12 +329,9 @@ export default function ArqueoPage() {
       <div className="max-w-2xl mx-auto px-4 pb-10 space-y-4">
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm">
-            ❌ {error}
-          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm">❌ {error}</div>
         )}
 
-        {/* ══════════ TAB: ARQUEO ══════════ */}
         {tab === "arqueo" && (
           <>
             {cargando ? (
@@ -312,13 +340,8 @@ export default function ArqueoPage() {
                 <span className="text-sm font-medium">Cargando estado de caja...</span>
               </div>
             ) : cierreResult ? (
-              // ── RESULTADO DEL CIERRE
-              <ResultadoCierre
-                result={cierreResult}
-                onNuevoTurno={() => { setCierreResult(null); cargarEstado(); }}
-              />
+              <ResultadoCierre result={cierreResult} onNuevoTurno={() => { setCierreResult(null); cargarEstado(); }} />
             ) : turnoAbierto ? (
-              // ── TURNO ABIERTO: formulario de cierre
               <>
                 {/* Info turno */}
                 <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
@@ -334,15 +357,104 @@ export default function ArqueoPage() {
                   </p>
                 </div>
 
-                {/* Retiros del turno */}
+                {/* Movimientos manuales */}
+                <div className="bg-white rounded-2xl shadow p-4 border border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-gray-700">🔄 Movimientos del turno</p>
+                    <button
+                      onClick={() => { setMostrarFormMovimiento(!mostrarFormMovimiento); setErrorMov(null); }}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition"
+                    >
+                      {mostrarFormMovimiento ? "Cancelar" : "+ Registrar"}
+                    </button>
+                  </div>
+
+                  {mostrarFormMovimiento && (
+                    <div className="bg-gray-50 rounded-xl p-4 mb-3 border border-gray-200 space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        {(["egreso", "ingreso"] as const).map(t => (
+                          <button
+                            key={t}
+                            onClick={() => setTipoMov(t)}
+                            className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition ${
+                              tipoMov === t
+                                ? t === "egreso" ? "bg-red-50 border-red-400 text-red-700" : "bg-green-50 border-green-400 text-green-700"
+                                : "bg-white border-gray-200 text-gray-500"
+                            }`}
+                          >
+                            {t === "egreso" ? "💸 Egreso" : "💵 Ingreso"}
+                          </button>
+                        ))}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Monto *</label>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={montoMov}
+                          onChange={e => { setMontoMov(e.target.value); setErrorMov(null); }}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Detalle *</label>
+                        <input
+                          type="text"
+                          placeholder={tipoMov === "egreso" ? "Ej: Compra de yerba, pago flete..." : "Ej: Pago de cliente fuera del sistema..."}
+                          value={detalleMov}
+                          onChange={e => { setDetalleMov(e.target.value); setErrorMov(null); }}
+                          onKeyDown={e => e.key === "Enter" && registrarMovimiento()}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      {errorMov && <p className="text-red-500 text-xs">❌ {errorMov}</p>}
+                      <button
+                        onClick={registrarMovimiento}
+                        disabled={guardandoMov}
+                        className={`w-full py-2.5 text-white font-semibold rounded-xl text-sm disabled:opacity-60 transition ${
+                          tipoMov === "egreso" ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"
+                        }`}
+                      >
+                        {guardandoMov ? "⏳ Guardando..." : `Registrar ${tipoMov}`}
+                      </button>
+                    </div>
+                  )}
+
+                  {movimientos.length === 0 && !mostrarFormMovimiento ? (
+                    <p className="text-xs text-gray-400 text-center py-3">No hay movimientos en este turno</p>
+                  ) : movimientos.length > 0 ? (
+                    <div className="space-y-2">
+                      {movimientos.map(m => (
+                        <div key={m.mov_id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                          <div className="min-w-0 flex items-center gap-1.5">
+                            <span className={`text-xs font-bold ${m.tipo === "egreso" ? "text-red-500" : "text-green-600"}`}>
+                              {m.tipo === "egreso" ? "↓" : "↑"}
+                            </span>
+                            <span className="text-gray-700 truncate">{m.detalle}</span>
+                            <span className="text-gray-400 text-xs shrink-0">· {fechaArg(m.fecha)}</span>
+                          </div>
+                          <span className={`font-semibold shrink-0 ml-3 ${m.tipo === "egreso" ? "text-red-500" : "text-green-600"}`}>
+                            {m.tipo === "egreso" ? "-" : "+"}{fmt(m.monto)}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="pt-2 border-t border-gray-100 flex justify-between text-xs font-semibold">
+                        {totalIngresosMov > 0 && <span className="text-green-700">+{fmt(totalIngresosMov)} ingresos</span>}
+                        {totalEgresosMov > 0 && <span className="text-red-600">-{fmt(totalEgresosMov)} egresos</span>}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Retiros del propietario (solo lectura) */}
                 {retiros.length > 0 && (
                   <div className="bg-white rounded-2xl shadow p-4 border border-gray-100">
-                    <p className="text-sm font-semibold text-gray-700 mb-3">💸 Retiros del turno</p>
+                    <p className="text-sm font-semibold text-gray-700 mb-3">💸 Retiros del propietario</p>
                     <div className="space-y-2">
                       {retiros.map(r => (
                         <div key={r.retiro_id} className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">{r.motivo} <span className="text-gray-400">· {fechaArg(r.fecha)}</span></span>
-                          <span className="font-semibold text-red-600">-{fmt(r.monto)}</span>
+                          <span className="text-gray-600 truncate">{r.motivo} <span className="text-gray-400">· {fechaArg(r.fecha)}</span></span>
+                          <span className="font-semibold text-red-600 shrink-0 ml-3">-{fmt(r.monto)}</span>
                         </div>
                       ))}
                       <div className="border-t pt-2 flex justify-between text-sm font-semibold">
@@ -356,7 +468,6 @@ export default function ArqueoPage() {
                 {/* Cerrar turno */}
                 <div className="bg-white rounded-2xl shadow p-5 border border-gray-100">
                   <h2 className="text-base font-semibold text-gray-700 mb-4">🔒 Cerrar turno</h2>
-
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     Efectivo contado en caja <span className="text-red-500">*</span>
                   </label>
@@ -367,10 +478,7 @@ export default function ArqueoPage() {
                     onChange={e => setEfectivoContado(e.target.value)}
                     className="w-full px-3 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-
-                  <label className="block text-sm font-medium text-gray-600 mt-4 mb-1">
-                    Nota (opcional)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-600 mt-4 mb-1">Nota (opcional)</label>
                   <textarea
                     placeholder="Observaciones del turno..."
                     value={notaCierre}
@@ -378,7 +486,6 @@ export default function ArqueoPage() {
                     rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   />
-
                   <button
                     onClick={cerrarTurno}
                     disabled={cerrando || !efectivoContado}
@@ -389,13 +496,9 @@ export default function ArqueoPage() {
                 </div>
               </>
             ) : (
-              // ── SIN TURNO: formulario de apertura
               <div className="bg-white rounded-2xl shadow p-5 border border-gray-100">
                 <h2 className="text-base font-semibold text-gray-700 mb-4">🔓 Abrir turno</h2>
-
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Tu nombre <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Tu nombre <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   placeholder="Nombre del empleado"
@@ -403,10 +506,7 @@ export default function ArqueoPage() {
                   onChange={e => setNombreEmpleado(e.target.value)}
                   className="w-full px-3 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-
-                <label className="block text-sm font-medium text-gray-600 mt-4 mb-1">
-                  Efectivo inicial en caja <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-600 mt-4 mb-1">Efectivo inicial en caja <span className="text-red-500">*</span></label>
                 <input
                   type="number"
                   placeholder={efectivoSugerido !== null ? String(efectivoSugerido) : "0.00"}
@@ -419,7 +519,6 @@ export default function ArqueoPage() {
                     💡 Último cierre: {fmt(efectivoSugerido)} — podés usar ese valor o cambiarlo
                   </p>
                 )}
-
                 <button
                   onClick={abrirTurno}
                   disabled={abriendo}
@@ -432,7 +531,6 @@ export default function ArqueoPage() {
           </>
         )}
 
-        {/* ══════════ TAB: HISTORIAL ══════════ */}
         {tab === "historial" && (
           <>
             {cargandoHistorial ? (
@@ -460,7 +558,6 @@ export default function ArqueoPage() {
   );
 }
 
-// ── Componente: resultado del cierre
 function ResultadoCierre({ result, onNuevoTurno }: { result: CierreResult; onNuevoTurno: () => void }) {
   const { arqueo, combinaciones_sugeridas, hay_diferencia } = result;
   const resumen: ResumenCierre = arqueo.resumen;
@@ -470,14 +567,12 @@ function ResultadoCierre({ result, onNuevoTurno }: { result: CierreResult; onNue
 
   return (
     <div className="space-y-4">
-
-      {/* Estado general */}
       <div className={`rounded-2xl p-5 border ${hay_diferencia ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xl">{hay_diferencia ? "⚠️" : "✅"}</span>
           <p className={`font-bold text-lg ${hay_diferencia ? "text-red-700" : "text-green-700"}`}>
             {hay_diferencia
-              ? `Diferencia de ${fmt(difAbs)} (${esSobrante ? "SOBRANTE" : "FALTANTE"})`
+              ? `Diferencia de $${difAbs.toLocaleString("es-AR", { minimumFractionDigits: 2 })} (${esSobrante ? "SOBRANTE" : "FALTANTE"})`
               : "Caja perfecta"}
           </p>
         </div>
@@ -489,14 +584,19 @@ function ResultadoCierre({ result, onNuevoTurno }: { result: CierreResult; onNue
         )}
       </div>
 
-      {/* Detalle numérico */}
       <div className="bg-white rounded-2xl shadow p-5 border border-gray-100">
         <p className="text-sm font-semibold text-gray-700 mb-3">📊 Detalle del turno</p>
         <div className="space-y-2 text-sm">
           <FilaResumen label="Efectivo inicial" valor={resumen.efectivo_inicial} />
           <FilaResumen label="+ Ventas en efectivo" valor={resumen.ingresos_efectivo} color="text-green-600" />
           <FilaResumen label="- Reembolsos en efectivo" valor={-resumen.egresos_reembolsos} color="text-red-500" />
-          <FilaResumen label="- Retiros" valor={-resumen.egresos_retiros} color="text-red-500" />
+          <FilaResumen label="- Retiros del propietario" valor={-resumen.egresos_retiros} color="text-red-500" />
+          {resumen.ingresos_manuales > 0 && (
+            <FilaResumen label="+ Ingresos manuales" valor={resumen.ingresos_manuales} color="text-green-600" />
+          )}
+          {resumen.egresos_manuales > 0 && (
+            <FilaResumen label="- Egresos manuales" valor={-resumen.egresos_manuales} color="text-red-500" />
+          )}
           <div className="border-t my-2" />
           <FilaResumen label="Esperado en caja" valor={resumen.esperado} bold />
           <FilaResumen label="Contado por empleado" valor={resumen.contado} bold />
@@ -510,26 +610,22 @@ function ResultadoCierre({ result, onNuevoTurno }: { result: CierreResult; onNue
         </div>
       </div>
 
-      {/* Comprobantes candidatos */}
       {hay_diferencia && combinaciones_sugeridas.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5">
-          <p className="text-sm font-semibold text-yellow-800 mb-1">
-            🔍 Posibles causas de la diferencia
-          </p>
+          <p className="text-sm font-semibold text-yellow-800 mb-1">🔍 Posibles causas de la diferencia</p>
           <p className="text-xs text-yellow-700 mb-3">
-            Estas ventas registradas como {esSobrante ? "no-efectivo" : "no-efectivo"} podrían explicar la diferencia.
-            Revisalas en Loyverse y corregilas si corresponde.
+            Estas ventas registradas como no-efectivo podrían explicar la diferencia. Revisalas en Loyverse y corregilas si corresponde.
           </p>
           <div className="space-y-3">
             {combinaciones_sugeridas.map((combo, i) => (
               <div key={i} className="bg-white rounded-xl p-3 border border-yellow-100">
                 <p className="text-xs font-semibold text-gray-500 mb-2">
-                  Opción {i + 1} — total {fmt(combo.total)}
+                  Opción {i + 1} — total ${combo.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                 </p>
                 {combo.ventas.map((v, j) => (
                   <div key={j} className="flex items-center justify-between text-xs text-gray-600 py-1 border-b last:border-0">
                     <span>#{v.receipt_number} · {metodosLabel(v.metodos)} · {fechaArg(v.fecha)}</span>
-                    <span className="font-semibold">{fmt(v.total_no_efectivo)}</span>
+                    <span className="font-semibold">${v.total_no_efectivo.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</span>
                   </div>
                 ))}
               </div>
@@ -538,10 +634,28 @@ function ResultadoCierre({ result, onNuevoTurno }: { result: CierreResult; onNue
         </div>
       )}
 
-      <button
-        onClick={onNuevoTurno}
-        className="w-full py-3 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-xl"
-      >
+      {arqueo.movimientos_turno?.length > 0 && (
+        <div className="bg-white rounded-2xl shadow p-4 border border-gray-100">
+          <p className="text-sm font-semibold text-gray-700 mb-3">🔄 Movimientos del turno</p>
+          <div className="space-y-1.5">
+            {arqueo.movimientos_turno.map((m: Movimiento, i: number) => (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 truncate">
+                  <span className={`font-semibold mr-1 ${m.tipo === "egreso" ? "text-red-500" : "text-green-600"}`}>
+                    {m.tipo === "egreso" ? "↓" : "↑"}
+                  </span>
+                  {m.detalle}
+                </span>
+                <span className={`font-semibold shrink-0 ml-3 ${m.tipo === "egreso" ? "text-red-500" : "text-green-600"}`}>
+                  {m.tipo === "egreso" ? "-" : "+"}${m.monto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button onClick={onNuevoTurno} className="w-full py-3 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-xl">
         ✅ Listo — Abrir nuevo turno
       </button>
     </div>
@@ -553,7 +667,9 @@ function FilaResumen({ label, valor, bold, color }: { label: string; valor: numb
     <div className="flex justify-between">
       <span className={`text-gray-600 ${bold ? "font-semibold" : ""}`}>{label}</span>
       <span className={`${bold ? "font-bold" : "font-medium"} ${color || "text-gray-800"}`}>
-        {valor >= 0 ? fmt(valor) : `-${fmt(Math.abs(valor))}`}
+        {valor >= 0
+          ? `$${valor.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`
+          : `-$${Math.abs(valor).toLocaleString("es-AR", { minimumFractionDigits: 2 })}`}
       </span>
     </div>
   );
@@ -578,9 +694,9 @@ function ArqueoCard({ arqueo }: { arqueo: any }) {
         </div>
         <div className="text-right">
           <p className={`text-sm font-bold ${hayDif ? (dif > 0 ? "text-orange-500" : "text-red-600") : "text-green-600"}`}>
-            {hayDif ? `${dif > 0 ? "+" : ""}${fmt(dif)}` : "✅ OK"}
+            {hayDif ? `${dif > 0 ? "+" : "-"}$${Math.abs(dif).toLocaleString("es-AR", { minimumFractionDigits: 2 })}` : "✅ OK"}
           </p>
-          <p className="text-xs text-gray-400">contado: {fmt(arqueo.efectivo_contado)}</p>
+          <p className="text-xs text-gray-400">contado: ${arqueo.efectivo_contado?.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>
         </div>
       </div>
       {expandido && (
@@ -588,9 +704,28 @@ function ArqueoCard({ arqueo }: { arqueo: any }) {
           <FilaResumen label="Efectivo inicial" valor={arqueo.efectivo_inicial} />
           <FilaResumen label="Ingresos efectivo" valor={arqueo.resumen?.ingresos_efectivo ?? 0} color="text-green-600" />
           <FilaResumen label="Reembolsos" valor={-(arqueo.resumen?.egresos_reembolsos ?? 0)} color="text-red-500" />
-          <FilaResumen label="Retiros" valor={-(arqueo.resumen?.egresos_retiros ?? 0)} color="text-red-500" />
+          <FilaResumen label="Retiros propietario" valor={-(arqueo.resumen?.egresos_retiros ?? 0)} color="text-red-500" />
+          {(arqueo.resumen?.ingresos_manuales ?? 0) > 0 && (
+            <FilaResumen label="Ingresos manuales" valor={arqueo.resumen.ingresos_manuales} color="text-green-600" />
+          )}
+          {(arqueo.resumen?.egresos_manuales ?? 0) > 0 && (
+            <FilaResumen label="Egresos manuales" valor={-(arqueo.resumen.egresos_manuales)} color="text-red-500" />
+          )}
           <FilaResumen label="Esperado" valor={arqueo.resumen?.esperado ?? 0} bold />
           <FilaResumen label="Contado" valor={arqueo.efectivo_contado} bold />
+          {arqueo.movimientos_turno?.length > 0 && (
+            <div className="pt-2 mt-1 border-t border-gray-100">
+              <p className="text-xs text-gray-400 mb-1.5 font-semibold">Movimientos</p>
+              {arqueo.movimientos_turno.map((m: Movimiento, i: number) => (
+                <div key={i} className="flex justify-between text-xs text-gray-500 py-0.5">
+                  <span className="truncate">{m.detalle}</span>
+                  <span className={m.tipo === "egreso" ? "text-red-400" : "text-green-500"}>
+                    {m.tipo === "egreso" ? "-" : "+"}${m.monto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           {arqueo.nota && <p className="text-xs text-gray-400 mt-2 italic">&ldquo;{arqueo.nota}&rdquo;</p>}
         </div>
       )}
