@@ -126,6 +126,7 @@ export default function ArqueoPage() {
   useEffect(() => {
     if (!autenticado) return;
     cargarEstado();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autenticado]);
 
   async function cargarEstado() {
@@ -590,7 +591,7 @@ function ArqueoCard({ arqueo }: { arqueo: any }) {
           <FilaResumen label="Retiros" valor={-(arqueo.resumen?.egresos_retiros ?? 0)} color="text-red-500" />
           <FilaResumen label="Esperado" valor={arqueo.resumen?.esperado ?? 0} bold />
           <FilaResumen label="Contado" valor={arqueo.efectivo_contado} bold />
-          {arqueo.nota && <p className="text-xs text-gray-400 mt-2 italic">"{arqueo.nota}"</p>}
+          {arqueo.nota && <p className="text-xs text-gray-400 mt-2 italic">&ldquo;{arqueo.nota}&rdquo;</p>}
         </div>
       )}
     </div>

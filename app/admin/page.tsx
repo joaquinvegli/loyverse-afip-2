@@ -106,6 +106,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (autenticado) { cargarDatos(); cargarRetiros(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autenticado]);
 
   async function registrarRetiro() {
