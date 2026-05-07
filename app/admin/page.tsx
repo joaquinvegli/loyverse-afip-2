@@ -172,6 +172,7 @@ export default function AdminPage() {
           </div>
           <div className="flex items-center gap-4">
             <button onClick={() => router.push("/")} className="text-gray-400 hover:text-white text-xs transition">← Facturador</button>
+            <button onClick={() => router.push("/admin/sueldos")} className="text-gray-400 hover:text-white text-xs transition">Sueldos</button>
             <button onClick={handleLogout} className="text-gray-500 hover:text-white text-xs transition">Cerrar sesión</button>
           </div>
         </div>
